@@ -15,7 +15,7 @@ research and industry.
 
 ## Instructors
 
-* Lead Instructor: 
+* Lead Instructor: Jayashree Ravi (jayaravi@umich.edu)
 * GSIs: 
 
 ## Software
