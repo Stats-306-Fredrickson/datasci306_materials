@@ -49,7 +49,7 @@ git clone <repository>
 For example, if you want to get the course repository on your personal computer, you may run: 
 
 ```{bash gitCloneEx, eval=FALSE}
-git clone https://github.com/Stats-306-Fall-2022-Teaching-Team/stats306_fall_2022.git
+git clone https://github.com/jravi123/stats306-w24
 ```
 
 Once you have cloned a "remote" repository on to your personal computer, it's possible that changes to the "remote" repository are made. 
@@ -97,8 +97,8 @@ library(learnr, tidyverse)
 ## Assignment and Operations
 
 - The standard form of an assignment is <OBJECT_NAME> <- <OBJECT_VALUE>
-- The form <OBJECT_NAME> = <OBJECT_VALUE> can also work, but isn't standard
-- A name can contain letters, numbers, underscores, and dots
+- The form <OBJECT_NAME> = <OBJECT_VALUE> also works, but R's community prefers <- notation
+- A name can contain letters, numbers, underscores, and dots but should start with a letter
 
 ```{r assignment}
 #variable assignments
@@ -129,6 +129,15 @@ z <- TRUE
 # your code here
 ```
 
+## Coding Style
+
+Good coding style is like correct punctuation: you can manage without it, butitsuremakesthingseasiertoread. 
+
+(picked this statement from: https://style.tidyverse.org/index.html)
+
+Please try to follow the recommended coding style right from get go!
+
+
 ## Function Calls
 
 We can use '?' to look up documentation of functions
@@ -140,7 +149,7 @@ sqrt(5)
 
 ```{r log}
 log(100)  # natural log
-log(100, base=10) # log with base 10
+log(100, base = 10) # log with base 10
 ```
 
 ```{r round}
@@ -180,7 +189,7 @@ Exercise 2: write a function to print the volume of a cylinder of radius $r$ cm,
 - The vector is the basic data structure in R
 - Two kinds of vectors:
   + Atomic vectors: each component is of the same type
-  + Lists: components can be of different types
+  + Lists: components can be atomic vectors or any other type
 
 ```{r atomicvec}
 int_vec <- c(2L, 3L, 5L, 8L) # Make an atomic vector containing integers
@@ -268,8 +277,8 @@ x >= y   ## greater than or equal to
 - 'and' and 'or'
 
 ```{r and-or}
-(5>2) | (1 == 0) 
-(5>2) & (1 == 0) 
+(5 > 2) | (1 == 0) 
+(5 > 2) & (1 == 0) 
 
 c = c(TRUE, TRUE, FALSE)
 d = c(TRUE, FALSE, FALSE)
@@ -382,7 +391,7 @@ Every ggplot2 plot has three key components:
 
 (Source: https://ggplot2-book.org/getting-started.html)
 
-ggplot is a layer-based function. We first create a coordinate system that you can add layers to using the function ggplot(data=...). This will creates an empty graph.
+ggplot is a layer-based function. We first create a coordinate system that you can add layers to using the function ggplot(data = ...). This will creates an empty graph.
 
 ```{r step1}
 ggplot(data = diamonds)
@@ -401,19 +410,16 @@ It would be helpful to also visualize the color of diamonds in the scatter plot.
 ggplot(data = diamonds) + 
     # carat on x-axis, price on y-axis, color represents different colors of the diamonds
     # alpha is the transparency of the points
-    geom_point(mapping = aes(x = carat, y = price, color = color), alpha=0.7)
+    geom_point(mapping = aes(x = carat, y = price, color = color), alpha = 0.7)
 ```
 
-Then we can use labs and ggtitle to specify axis labels and the title.
+Then we can add axes labels and title 
 
 ```{r step4}
 ggplot(data = diamonds) + 
-    geom_point(mapping = aes(x = carat, y = price, color = color), alpha=0.7) +
+    geom_point(mapping = aes(x = carat, y = price, color = color), alpha = 0.7) +
     # specify axis labels
-    labs(x = 'Carats', y = 'Price($)') + 
-
-    # specify the title
-    ggtitle('Diamond price by carat count')
+    labs(x = 'Carats', y = 'Price($)', title = 'Diamond price by carat count') 
 ```
 
 You can get a better background by changing the theme. You can find more information about ggplot [here](https://ggplot2.tidyverse.org/reference/ggtheme.html).
@@ -424,7 +430,7 @@ ggplot(data = diamonds) +
     # specify axis labels
     labs(x = 'Carats', y = 'Price($)') + 
 
-    # specify the title
+    # another way of specifying title
     ggtitle('Diamond price by carat count') +
   theme_bw()
 ```
@@ -433,8 +439,8 @@ You can also create subplots for different cut types by using `facet_wrap()`:
 
 ```{r facet}
 ggplot(data = diamonds) + 
-    geom_point(mapping = aes(x = carat, y = price, color = color), alpha=0.7) +
-    facet_wrap(~cut, ncol=3) +
+    geom_point(mapping = aes(x = carat, y = price, color = color), alpha = 0.7) +
+    facet_wrap(~cut, ncol = 3) +
     labs(x = 'Carats', y = 'Price($)') + 
     ggtitle('Diamond price by carat count') +
   theme_bw()
