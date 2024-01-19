@@ -11,24 +11,46 @@ library(tidyverse)
 
 ## Question 1 (3 points, 1 each per subproblem)
 
-In this section, we will use git from the command line to learn more about
-version control. If you have this document, you have probably already used git
-to retrieve our class repository. If not, follow the directions in lecture00 to get your own copy of the repository.
+In this section, you will create a git repository for your homework
 
-When you start RStudio on posit Cloud, typically the *Terminal* pane will default to  your repository's directory which is /cloud/project folder. You verify this using the print working directory command,  `pwd`. 
 
 ### Setting up git
 
-In the first lecture (`lectures/lecture00.Rmd` in this repository), there are
-directions to set up your git configuration to include your name and email
-address. Using the *Terminal* pane, use these commands to set up your name
-and email address.
+Open your terminal and run the below command 
+
+`git init`
+
+This initializes a local git repository on your homework project.
 
 The `config` subcommand also lets you retrieve settings. Use `git config` with
 the `get` option (recall: how are *optional* arguments passed to the command
 line arguments) to retrieve your `user.name` and `user.email`. You can also run the command `git config` to see the usage of the command.
 
-Put a copy of your session here:
+Check lecture notes: https://github.com/jravi123/stats306-w24/blob/master/lectures/lecture01.Rmd
+
+Copy and paste the command and the output from the terminal in the block below
+
+```
+
+```
+
+
+### Commiting to your local repository
+
+By this point you have made some changes to this hw01 file. Save the file.
+
+Go to the *Terminal* and type `git status`. What is this telling you?
+
+> YOUR ANSWER
+
+Use `git add hw01.Rmd` to place your changes in the staging area. Type `git status` again
+to see what happened.
+
+Right now, your homework is only "staged". Next, commit it with 
+
+`git commit -m "A COMMIT MESSAGE"`
+
+What was the commit ID of your changes?
 
 ```
 
@@ -47,25 +69,6 @@ For the most recent commit, fill out the following information:
 * Author:
 * Date:
 * Message:
-
-
-### Commiting to your local repository
-
-By this point you have made some changes to this hw01 file. Save the file.
-
-Go to the *Terminal* and type `git status`. What is this telling your?
-
-> YOUR ANSWER
-
-Use `git add homework/hw01.Rmd` to place your changes in the staging area. Type `git status` again
-to see what happened.
-
-Right now, your homework is only "staged". Next, commit it with `git commit -m
-"A COMMIT MESSAGE"`. What was the commit ID of your changes?
-
-```
-
-```
 
 Make sure to save this file and use `git add` and `git commit` to periodically save your changes.
 
@@ -92,6 +95,8 @@ up the code below to avoid repetition.
 
 ### Mean and Variance (2 points)
 
+For all the coding questions, you need to add the 'r' code block and complete your answers.
+
 The sample mean is defined as:
 
 $$ \bar X_n = \frac{1}{n} \sum_{i = 1}^n X_i$$
@@ -101,7 +106,8 @@ $$ \hat \sigma^2 = \frac{1}{n - 1} \sum_{i=1}^n (X_i - \bar X_n)^2$$
 
 Using *vectorized* computations, compute the sample mean and sample variance of
 the `displ` column of the `mpg` data set. Do not use the functions `mean` or
-`var`. You may use `length` and `sum`.
+`var`. You may use `length`, `nrow` and/or `sum`. 
+
 
 ## Question 3 (4 points)
 
@@ -125,7 +131,7 @@ about that point.
 ### Challenge problem (2 points)
 Each problem set will feature one or two questions that go a bit beyond what we have covered in lab and lecture. The goal of these is for you to learn how to use online resources (R's help, Google, Stack Overflow, etc.) to solve programming challenges that you have not encountered before. This is an important skill that you will use constantly as a data scientist in the real world.
 
-Load the mpg data set, and use it to reproduce the following horizontal box and whisker plot that shows the distribution of city miles per gallon for each distinct value you see in the class column. Highlight the outliers in red.
+Load the mpg data set, and use it to reproduce the following horizontal box and whisker plot that shows the distribution of city miles per gallon for each distinct value you see in the class column. Highlight the outliers in red. 
 
 
 <img src = 'images/class_of_car.png' />
