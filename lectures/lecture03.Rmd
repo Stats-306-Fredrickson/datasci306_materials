@@ -1,7 +1,8 @@
 ---
 title: "Stats 306: Lecture 3"
 subtitle: "More data exploration with ggplot"
-author: "Mark Fredrickson"
+author: "Jayashree Ravi"
+citation: Content adapted from slides by Dr. Mark Fredrickson
 output: 
   learnr::tutorial:
     progressive: true
@@ -17,22 +18,38 @@ library(tidyverse)
 
 ## Review: More on R
 
-* Learned more about R's functions (required and optional arguments)
-* Piping and assignment
+* Learned more about R's functions (required and optional arguments); `f(x, y =10)`
+* Piping and assignment; `|>, =`
 * Special values: `NA`, `NULL`, and `NaN`
-* Vectors: ordered collections of same type, many computations are *vectorized*
-* Lists: ordered collections of mixed types
-* Tables: lists of vectors of the same length (column oriented)
+* Vectors: ordered collections of same type, many computations are *vectorized*; See example below
+* Lists: ordered collections of mixed types; `c(1:10); list(1, c(1:10))`
+* Tables: lists of vectors of the same length (column oriented); `tibble, data.frame`
 * Other items: indexing with `[]` and `$`, `dim` and `colnames` for tables
 
-## Review: Graphing and Plotting
+**Example On Vectorized operations**
+
+Multiply all elements by 10
+
+```{r vectorized, exercise = T}
+v = c(1:10)
+print(v)
+
+```
+
+## Graphing and Plotting
 
 * Semiology of Graphics: Describes fundamental aspects of graphs, tasks
   * Visual variables (Position, Size, Value, Texture, Color, Orientation, Shape) 
-  * Relationships/Tasks: Selection (grouping), association (similarity across groups), order, quantity
+  * Relationships/Tasks: Comparison, Correlation, Hierarchical, part-to-whole
 * Grammar of Graphics, `ggplot2` library
 
-## The components of a ggplot graph
+```{r}
+ggplot(data = mpg,
+       aes(x = displ, y = hwy, color = cyl)) +
+  geom_point()
+```
+
+**The components of a ggplot graph**
 
 >* The graph object itself (creating using `ggplot(data)`)
 >* A set of *aesthetic* mappings (connecting data to visual variables)
@@ -42,21 +59,28 @@ library(tidyverse)
 >* Facet: breaking a single plot into many, similar plots
 >* Theme: all the other color and printing aspects of the plot
 
-## A simple plot
+**Alternative forms**
 
-```{r}
-ggplot(data = mpg,
-       aes(x = displ, y = hwy, color = cyl)) +
-  geom_point()
-```
-
-## Alternative form
-
-```{r}
+```{r eval = F}
 ggplot(data = mpg) + geom_point(aes(x = displ, y = hwy, color = cyl))
+
+mpg |> ggplot() + geom_point(aes(x = displ, y = hwy, color = cyl))
+
+mpg |> ggplot(mapping = aes(x = displ, y = hwy, color = cyl)) + geom_point()
+
+ggplot(mpg, aes(x = displ, y = hwy, color = cyl)) + geom_point()
+
+ggplot(mpg, aes(x = displ)) + geom_point(aes(y = hwy, color = cyl))
 ```
 
-## What aesthetic mappings can I use?
+Note: You can use positional arguments or use `data`, `mapping` argument names to call these functions
+
+mapping values from `ggplot` are inherited by layers
+
+
+## geom_point
+
+When to use scatter plot?
 
 Let's visit the docs: [`geom_point`](https://ggplot2.tidyverse.org/reference/geom_point.html)
 
@@ -68,36 +92,6 @@ ggplot(data = mpg,
            size = cyl,
            color = class)) + 
   geom_point()
-```
-
-## Using expressions
-
-We can also use expressions involving columns.
-
-```{r}
-ggplot(data = mpg,
-       aes(x = displ, y = hwy,
-           shape = year > 2000)) + 
-  geom_point()
-```
-
-## Overriding parameters for all points
-
-We can pass in constants that apply to all points (size and transparency):
-
-```{r}
-ggplot(data = mpg,
-       aes(x = displ, y = hwy,
-           shape = year > 2000)) + 
-  geom_point(size = 5, alpha = 0.5)
-```
-
-## Jitter: useful noise
-
-```{r}
-ggplot(data = mpg,
-       aes(x = displ, y = hwy)) + 
-  geom_point(position = "jitter")
 ```
 
 ## Other geometries
@@ -136,9 +130,19 @@ ggplot(data = mpg,
 
 ## Boxplot as statistic
 
+```{r}
 ggplot(data = mpg,
        aes(x = displ, y = class)) + 
   stat_boxplot() 
+```
+
+Compare with
+
+```{r}
+ggplot(data = mpg,
+       aes(x = displ, y = class)) + 
+  geom_boxplot() 
+```
 
 ## Adding computed summaries
 
@@ -168,7 +172,7 @@ ggplot(data = mpg, aes(x = displ)) +
   geom_point(aes(y = hwy), color = "orange") +
   geom_point(aes(y = cty), color = "blue") +
   stat_smooth(aes(y = hwy), lty = 1, color = "black") +
-  stat_smooth(aes(y = cty), lty = 2, color = "black")
+  stat_smooth(aes(y = cty), lty = 2, color = "red")
 ```
 
 We'll see a better way to make this table when we talk about tall vs. wide format data.
@@ -193,6 +197,7 @@ ggplot(data = mpg, aes(x = class, y = hwy)) +
 
 We often use **tables** in documents to give numerical summaries. But why not
 replace those with a nice graphic?
+
 ```{r}
 ggplot(data = mpg, aes(x = class, y = hwy)) +
   stat_summary(

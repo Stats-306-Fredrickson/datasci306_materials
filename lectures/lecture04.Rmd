@@ -1,7 +1,8 @@
 ---
 title: "Stats 306: Lecture 4"
 subtitle: "Graphics: Facets, Coordinate Systems"
-author: "Mark Fredrickson"
+author: "Jayashree Ravi"
+citation: Content adapted from slides by Dr. Mark Fredrickson
 output: 
   learnr::tutorial:
     progressive: true
@@ -19,7 +20,7 @@ library(lubridate) # install.packages("lubridate") if you don't have this
 
 ## Quantitative vs. Nominal measurements in R
 
-We have will not overly emphasize the difference between **quantitative** (continuous, numerical) data and **nominal** (discrete, categorical) data *but* it's good to know how R handles these things.
+We will not overly emphasize the difference between **quantitative** (continuous, numerical) data and **nominal** (discrete, categorical) data *but* it's good to know how R handles these things.
 
 ```{r}
 class(c(1.0, 2.2, 3.14159)) # quantitative
@@ -38,7 +39,7 @@ ggplot(data = mpg, aes(x = hwy, y = cty, color = cyl)) +
   geom_jitter(size = 2)
 ```
 
-## Forcing variables to be nominal
+**Forcing variables to be nominal**
 
 ```{r}
 ggplot(data = mpg, aes(x = hwy, y = cty, color = factor(cyl))) +
@@ -60,19 +61,26 @@ ggplot(data = mpg, aes(x = factor(cyl), y = cty)) +
 ```
 
 
-## Overprinting revisited
-
-We encountered **overprinting** when we were plotting cars' efficiency ratings. 
-
-Our previous solution used jitter and/or transparency.
-
-New idea: split up the plot by groups.
 
 ## Another overplotting example
 
 ```{r}
-ggplot(data = mpg, aes(x = cty, y = hwy, color = class)) +
+ggplot(diamonds, aes(carat, price)) +
+  geom_point()
+```
+
+Using jitter
+
+
+```{r}
+ggplot(diamonds, aes(carat, price)) +
   geom_jitter()
+```
+Jitter isn't helping. How about adding `alpha` param to aes instead?
+
+```{r}
+ggplot(diamonds, aes(carat, price)) + 
+  geom_point(alpha = 1/100)
 ```
 
 ## Introducing formulas
@@ -87,13 +95,15 @@ y ~ x1 + x2 + x3 * x4
 >* Delayed computation (early versions of `ggplot` used formulas in the `aes` function)
 >* Anonymous functions in `tidyverse` packages
 
-## Facets: "small multiples"
+## Facets: "sub grouping"
 
 ```{r}
 ggplot(data = mpg, aes(x = cty, y = hwy)) +
   geom_jitter() +
   facet_wrap(~ class)
 ```
+
+Faceting sub groups the dataset based on each distinct value of the column `class` and then plots the 'x' and 'y' specified.
 
 ## Forcing on one row
 
@@ -244,6 +254,12 @@ ggplot(data = aatemp, aes(x = factor(month), y = TMAX)) +
 
 
 ## Days with large temp jumps
+
+```{r}
+v = c(2, 4, 6, 7)
+print(v)
+diff(v)
+```
 
 ```{r}
 temp_diff <- diff(aatemp$TMAX)
