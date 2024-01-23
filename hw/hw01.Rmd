@@ -119,7 +119,7 @@ Investigate the data set `starwars`. Answer the following
 * What kind of data is the `species` column?
 * Explain what the value `NA` means in the `hair_color` column.
 * How many characters are from Tatooine?
-* For humans, what is the average (mean) age?
+* For humans, what is the average birth_year?
 
 
 ### Height and Mass (1 points)

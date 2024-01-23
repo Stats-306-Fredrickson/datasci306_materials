@@ -1,7 +1,9 @@
 ---
-title: "STATS306 Lab2"
-author: "Your Name"
-output: html_document
+title: "STATS 306 Lab2"
+output: 
+  learnr::tutorial:
+    progressive: true
+runtime: shiny_prerendered
 ---
 
 <style type="text/css">
@@ -83,6 +85,11 @@ ggplot(data = mpg) +
   geom_point(mapping = aes(x = cty, y = hwy, color = drv))
 ```
 
+```{r exercise1a-solution}
+ggplot(data = mpg) + 
+  geom_point(mapping = aes(x = cty, y = hwy, color = drv, shape = drv))
+```
+
 #### (b) {-}
 
 Modify the code below so that each point is a triangle. How is your code different from your code for part (a)? Why is it different?
@@ -92,6 +99,15 @@ Modify the code below so that each point is a triangle. How is your code differe
 ```{r exercise1b, exercise=TRUE}
 ggplot(data = mpg) + 
   geom_point(mapping = aes(x = cty, y = hwy, color = drv))
+```
+
+```{r exercise1b-solution}
+# The key difference here is that the shape = part goes outside aes() instead
+# of inside aes(). This is because here we're setting shape to a constant
+# instead of mapping it to a variable. Only aesthetic mappings go inside
+# aes().
+ggplot(data = mpg) + 
+  geom_point(mapping = aes(x = cty, y = hwy, color = drv), shape = "triangle")
 ```
 
 ## Geometric Elements
@@ -150,7 +166,7 @@ midwest %>%
 
 Just like in the one variable case, when we have two variables, we first need to determine the types of the variables before we make our plot.
 
-We can make a scatterplot with `geom_point()` if both variables are numerical. The plot below displays the relationship between `perchsd` and `percadultpoverty`, the percentage of adults below the poverty line.
+We can make a scatterplot with `geom_point()` if both variables are continuous variable. The plot below displays the relationship between `perchsd` and `percadultpoverty`, the percentage of adults below the poverty line.
 
 ```{r geom_point_example}
 midwest %>%
@@ -176,6 +192,13 @@ Make a plot of `percadultpoverty` versus `perchsd` that has both points and a sm
 
 ```
 
+```{r exercise2a-solution}
+midwest %>%
+  ggplot(aes(perchsd, percadultpoverty)) +
+  geom_point() +
+  geom_smooth(se = FALSE)
+```
+
 ##### (b) {-}
 
 Make a plot that is the same as the one in part (a), except with a confidence interval around the smooth. What do you notice about the width of the interval? Why does it make sense for the width to be how it is?
@@ -186,6 +209,15 @@ Make a plot that is the same as the one in part (a), except with a confidence in
 
 ```
 
+```{r exercise2b-solution}
+# The width increases toward the sides of the plot. This makes sense, as there
+# are few points near the sides, so the estimates of the trend there should be
+# highly uncertain.
+midwest %>%
+  ggplot(aes(perchsd, percadultpoverty)) +
+  geom_point() +
+  geom_smooth() # Inserting se = TRUE is unnecessary since se = TRUE by default
+```
 ##### (c) {-}
 
 You might have noticed that the smooth in part (b) was calculated using a method called LOESS. Other methods can be used as well. Remake the plot, but with a smooth calculated using linear regression.
@@ -196,7 +228,14 @@ You might have noticed that the smooth in part (b) was calculated using a method
 
 ```
 
-A boxplot is one option if one variable is categorical and one is numerical. The following plot shows the distribution of `percollege`, the percentage of college graduates, by state.
+```{r exercise2c-solution}
+midwest %>%
+  ggplot(aes(perchsd, percadultpoverty)) +
+  geom_point() +
+  geom_smooth(method = "lm") # lm() is the function used for linear regression
+```
+
+`box and whisker plot` is meant for a continuous variable. When you want to group records based on a categorical variable and then draw a boxplot for the subset of the grouped data, you can use both the categorical and continuous as shown below.
 
 ```{r geom_boxplot_example2}
 midwest %>%
@@ -219,10 +258,19 @@ midwest2 %>%
 
 ##### (a) {-}
 
-Instead of using boxplots to visualize the relationship between `percollege` and `state`, we could use histograms. Make one plot that has a histogram of `percollege` for each value of `state`. Give the histograms different colors. How does this plot compare to the boxplot?
+A `histogram` is another plot meant for a continuous variable.
+Instead of drawing multiple boxplots to visualize the relationship between `percollege` and `state`, we could use histograms. Make one plot that has a histogram of `percollege` for each value of `state`. Give the histograms different colors. How does this plot compare to the boxplot?
 
 ```{r exercise3a, exercise=TRUE}
 
+```
+
+```{r exercise3a-solution}
+# This plot is harder to read than the boxplot. However, unlike the boxplot, it
+# does show that the different states have different numbers of counties.
+midwest %>%
+  ggplot(aes(percollege, color = state)) +
+  geom_histogram()
 ```
 
 ##### (b) {-}
@@ -233,6 +281,13 @@ Now make a one plot that has a frequency polygon for each state instead of a his
 
 ```
 
+```{r exercise3b-solution}
+# This plot is also hard to read, and it also shows the count information that
+# the boxplot doesn't show.
+midwest %>%
+  ggplot(aes(percollege, color = state)) +
+  geom_freqpoly()
+```
 ##### (c) {-}
 
 Complete the code below to use boxplots to visualize the relationship between `inmetro` and `percollege`. `inmetro` is `TRUE` if a county is in a metro area and false otherwise.
@@ -243,6 +298,13 @@ midwest %>%
   ggplot()
 ```
 
+```{r exercise3c-solution}
+midwest %>%
+  mutate(inmetro = as.logical(inmetro)) %>%
+  ggplot(aes(inmetro, percollege)) +
+  geom_boxplot()
+```
+
 ##### (d) {-}
 
 Now complete the code to use frequency polygons to visualize the relationship. Is this plot worse than the boxplot?
@@ -251,6 +313,16 @@ Now complete the code to use frequency polygons to visualize the relationship. I
 midwest %>%
   mutate(inmetro = as.logical(inmetro)) %>%
   ggplot
+```
+
+```{r exercise3d-solution}
+# Unlike the previous frequency polygon plot, this one isn't hard to read. This
+# plot provides count information that the boxplot doesn't provide. So, unlike
+# previously, the frequency polygon plot isn't worse than the boxplot.
+midwest %>%
+  mutate(inmetro = as.logical(inmetro)) %>%
+  ggplot(aes(percollege, color = inmetro)) +
+  geom_freqpoly()
 ```
 
 Finally, if both variables are categorical, we can plot them using `geom_count()`.
@@ -339,6 +411,15 @@ Let's return to the situation considered in Exercise 2(a). Again make a plot of 
 
 ```
 
+```{r exercise4a-solution}
+# A very wiggly smooth might capture quirks of the data that are due to chance
+# variation instead of the underlying pattern
+midwest %>%
+  ggplot(aes(perchsd, percadultpoverty)) +
+  geom_point() +
+  stat_smooth(span = 0.1) # Any small value is acceptable here
+```
+
 #### (b) {-}
 
 Like you did in Exercise 2(b), make a scatterplot of `percadultpoverty` versus `perchsd` with a confidence interval around the smooth. This time, create a confidence interval whose level is 0.5. Why is the interval different from the previous interval?
@@ -347,4 +428,13 @@ Like you did in Exercise 2(b), make a scatterplot of `percadultpoverty` versus `
 
 ```{r exercise4b, exercise=TRUE}
 
+```
+
+```{r exercise4b-solution}
+# The confidence level for the previous interval was 0.95. The smaller the
+# confidence level, the narrower the interval is.
+midwest %>%
+  ggplot(aes(perchsd, percadultpoverty)) +
+  geom_point() +
+  stat_smooth(level = 0.5)
 ```
