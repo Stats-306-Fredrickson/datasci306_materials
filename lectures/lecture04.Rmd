@@ -207,6 +207,8 @@ mpg_boxplot <- ggplot(data = mpg, aes(x = class, fill = class)) +
 print(mpg_boxplot)
 ```
 
+
+
 ## Flipping coordinates
 
 ```{r}
