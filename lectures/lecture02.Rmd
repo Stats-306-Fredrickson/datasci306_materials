@@ -51,10 +51,24 @@ random_u01[1] # first item
 random_u01[10] # last item
 random_u01[-1] # all but first
 random_u01[1:3] # first three
-random_u01[c(1, 3, 7, 1)]
+random_u01[3:6] # a "slice" in the middle
+random_u01[c(1, 3, 7, 1)] # arbitrary choices
 ```
 
 
+## Exercise
+
+Pull out the last three items in the vectors `letters`. A little help to get you started:
+
+```{r lettersxyz, exercise = TRUE}
+length(letters)
+```
+
+
+```{r lettersxyz-solution}
+letters[c(24, 25, 26)]
+letters[-(1:23)]
+```
 
 ## Relational Operators
 
@@ -80,6 +94,26 @@ print(less_than_0.5)
 random_u01[less_than_0.5]
 keep(random_u01, random_u01 < 0.5)
 ```
+
+## Exercise
+
+Use the following hint to keep only the even numbers.
+
+```{r}
+(7 %% 2) == 0 
+(8 %% 2) == 0
+```
+
+
+```{r onlyodd, exercise = TRUE}
+x <- 1:10
+```
+
+```{r onlyodd-solution}
+x <- 1:10
+keep(x, (x %% 2) == 0)
+```
+
 
 ## Lists, heterogenous collections
 
@@ -129,11 +163,26 @@ mpg$hwy |> mean() # equiv to mean(mpg$hwy)
 sum(mpg$hwy)
 mean(mpg$hwy)
 var(mpg$hwy)
-sqrt(var(mpg$hwy)) # standard deviation
+sd(mpg$hwy) 
 median(mpg$hwy)
 IQR(mpg$hwy)
 quantile(mpg$hwy, c(0.25, 0.75))
 ```
+
+## Exercise
+
+What is the average `year` of the cars in `mpg`? What is the standard deviation of the city mileage (`cty`)?
+
+```{r mpgsummary, exercise = TRUE}
+
+```
+
+```{r}
+mean(mpg$year)
+mpg$cty |> sd()
+```
+
+
 
 ## Dealing with missingness
 
@@ -271,8 +320,13 @@ glwl <- read_csv("data/GLHYD_data_english_cleaned.csv.gz") |>
 ```
 
 ```{r glwl-plot, exercise = TRUE}
-
 ```
+
+```{r glwl-solution}
+ggplot(glwl, aes(x = year, y = ht, color = body)) + geom_point()
+ggplot(glwl, aes(x = year, y = ht, color = body)) + geom_line()
+```
+
 
 Improve your plot by changing it to a `geom_line()`
 
