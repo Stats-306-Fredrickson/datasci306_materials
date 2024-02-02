@@ -1,7 +1,8 @@
 ---
 title: "Stats 306: Lecture 5"
 subtitle: "Tables: Selecting, Filtering; Grouping and Summaries"
-author: "Mark Fredrickson"
+author: "Jayashree Ravi"
+citation: "Content adapted from slides by Dr. Mark Fredrickson"
 output: 
   learnr::tutorial:
     progressive: true
@@ -28,7 +29,7 @@ Review:
 Example:
 ```{r}
 x <- 1:10
-y <- 100:109
+y <- paste(100:109)
 length(x)
 length(y)
 d <- list(column_x = x, column_y = y)
@@ -62,9 +63,13 @@ Recall: to get something out of a list, use the dollar sign `$` operator
 
 ```{r}
 d3$column_x
-d3$x_plus_y <- d3$column_x + d3$column_y
+d3$x_plus_y <- d3$column_x + as.numeric(d3$column_y)
 head(d3, 2)
 ```
+
+
+**What does as.numeric function do?**
+
 
 ## Getting several columns at once
 
@@ -78,7 +83,17 @@ select(d3, column_x, x_plus_y) |> head(2)
 select(d3, !column_x) |> head(2)
 ```
 
+Alternatively
+```{r}
+select(d3, -column_x) |> head(2)
+```
+
 ## Selectively grabbing columns
+
+
+```{r letters, exercise = TRUE}
+
+```
 
 ```{r}
 d3$letter <- letters[d3$column_x]
@@ -90,13 +105,23 @@ Get only "character" type columns:
 select(d3, where(is.character)) |> head(2)
 ```
 
-## 'is' functions for columns
+## 'is' and 'as' functions for columns
 
 * `is.character`: strings/character vectors
 * `is.numeric`: number/numeric
 * `is.factor`: factor/categories
 * `is.logical`: logical/boolean
 * `is.double`, `is.integer`: decimal and integer numeric types, respectively
+
+While the `is` prefix returns a boolean result based on if the passed in argument belongs to the suffix, the `as` prefix functions converts the given argument to the corresponding suffix class if only it is convertable, else 'NA' is returned
+
+```{r}
+as.numeric('10')
+as.numeric('abc')
+as.logical('F')
+as.logical(1)
+as.logical('a')
+```
 
 When we start to write our own functions, we'll be able to create many more
 
@@ -127,15 +152,19 @@ filter(d3, column_y > 105)
 
 ```{r}
 filter(d3, column_y > 105 & column_x < 9)
+
+# preferred alternative
+
+filter(d3, column_y > 105, column_x < 9)
 ```
 
 ```{r}
-filter(d3, column_y > 108 | column_x  < 3)
+filter(d3, column_y > 108 | column_x < 3)
 ```
 
 ## Exercise
 
-Combine `filter` and `select` to get only the columns `cty` and `hwy` for cars that have more than 4 cylinders.
+Combine `filter` and `select` to get only the columns `cty` , `hwy`, and `cyl` for cars that have more than 4 cylinders.
 
 ```{r}
 head(mpg, 1)
@@ -156,10 +185,12 @@ Before we had code like:
 df$new_column <- f(df$x, df$y)
 ```
 
-It would be convenient to avoid the repeated `df$`:
+It would be convenient to avoid the repeated `df$` and also not tamper with the existing table but create a new one instead:
 ```{r eval = FALSE}
 new_df <- mutate(df, new_column = f(x, y))
 ```
+
+By default, `mutate`, returns a brand new table by adding the new column to df and existing df is not changed.
 
 ## Mutate creates new tables
 
@@ -200,7 +231,7 @@ ggplot(aatemp3, aes(x = z)) + geom_histogram()
 
 ## Conditional evaluation with `if_else`
 
-We may want to create new values using a condition. The `if_else` and function can help:
+We may want to create new values using a condition. The `if_else` function from `dplyr` (part of `tidyverse`) can help:
 ```{r}
 if_else(c(TRUE, FALSE, FALSE), c("aT", "bT", "cT"), c("aF", "bF", "cF"))
 ```
@@ -211,7 +242,17 @@ x <- c(-2, 1.4, -0.25, 7)
 if_else(x < 0, 0, x)
 ```
 
-There is also `ifelse`, which is similar, but a bit more permissive in what it allows for the two result vectors.
+
+There is also `ifelse` from base R, which is similar, but a bit more permissive in what it allows for the two result vectors.
+
+```{r if-else, exercise = T}
+
+ifelse(c(TRUE, FALSE, FALSE), 'a', 0)
+
+if_else(c(TRUE, FALSE, FALSE), 'a', 0)
+```
+
+Since `if_else` is more efficient also, we will use `if_else`
 
 ## Exercise
 
@@ -224,6 +265,12 @@ d <- data.frame(x = rnorm(10))
 
 ```
 
+```{r rescale-solution}
+d <- data.frame(x = rnorm(10))
+mutate(d, y_i = (x - min(x) / (max(x) - min(x))))
+
+```
+
 ## Exercise
 
 Use `if_else` to replace any value greater than 1 with the value 1 and any value less than -1 with the value -1 (this is called "top coding").(*Hint*: you may want to do it two steps.)
@@ -232,6 +279,16 @@ Use `if_else` to replace any value greater than 1 with the value 1 and any value
 d <- data.frame(x = c(-0.19, 1.35, 1.21, -0.11, -0.99, 
                       -0.4, -0.04, -0.4, 0.82, -1.55))
 
+```
+
+```{r topcoding-solution}
+d <- data.frame(x = c(-0.19, 1.35, 1.21, -0.11, -0.99, 
+                      -0.4, -0.04, -0.4, 0.82, -1.55))
+d |> mutate(x = if_else(x > 1, 1, x),
+            x = if_else(x < -1, -1, x)) |> head(10)
+
+# alternatively
+d |> mutate(x = if_else(x > 1, 1, if_else(x < -1, -1, x))) |> head(10)
 ```
 
 ## `transmute`: `mutate` + `select`
@@ -256,19 +313,50 @@ The `summarize` function is from `dplyr` (part of `tidyverse`) and allows comput
 summarize(aat_4col, avg_TMAX = mean(TMAX), days_of_snow = sum(!is.na(SNOW)))
 ```
 
-## Summarize variations: `_if`, `_at`, `_all`
+
+## `across` function
 
 ```{r}
-select(aatemp, where(is.numeric)) |> summarize_all(mean, na.rm = TRUE)
-summarize_if(aatemp, is.numeric, var, na.rm = TRUE)
-summarize_at(aatemp, c("TMAX", "TMIN"), c(maximum = max, minimum = min))
+aatemp |> summarize(across(where(is.numeric), \(x) mean(x, na.rm = TRUE)))
 ```
+
+the `\(x) mean(x, na.rm = T)` is an anonymous function being passed in to the across function.
+
+This is same as:
+
+```{r}
+aatemp |> summarize(across(where(is.numeric), ~mean(., na.rm = TRUE)))
+```
+
+Alternatively, you can also define your own function and use that instead
+
+```{r}
+my_function <- function(x){
+   mean(x, na.rm = T)
+}
+aatemp |> summarize(across(where(is.numeric), my_function))
+```
+
+
+```{r}
+aatemp %>%
+  summarize(across(where(is.numeric), 
+                   list(mean = ~mean(., na.rm = TRUE),
+                        max = ~max(., na.rm = TRUE),
+                        median = ~median(., na.rm = TRUE))))
+```
+
+Earlier we would use the summarize variations: `_if`, `_at`, `_all` but now `across` has superseded them.
 
 ## Exercise
 
 For the `mpg` data set, compute the mean `hwy` mileage and median `cty` mileage. Compute the variance of the ratio of `hwy` to `city`.
 ```{r summary, exercise = TRUE}
 
+```
+
+```{r summary-solution}
+mpg |> summarize(hwy_mean = mean(hwy), cty_median = median(cty), var_ratio = var(hwy)/var(cty))
 ```
 
 ## Grouping
@@ -285,47 +373,45 @@ group_by(aatemp, year(DATE)) |> summarize(avg_TMAX = mean(TMAX), days_of_snow = 
 
 aat_year <- group_by(aatemp, year(DATE))
 nrow(aat_year) == nrow(aatemp)
-colnames(aat_year)[18]
+length(colnames(aatemp))
+length(colnames(aat_year))
+aat_year[17]
 group_vars(aat_year)
 ```
 
 ## Grouping by year and month
-```{r}
-aat_year_month <- group_by(aat_year, month(DATE), .add = TRUE)
-group_vars(aat_year_month)
-```
+
 
 ```{r}
-aat_year_month <- group_by(aatemp, year(DATE), month(DATE))
+aat_year_month <- mutate(aatemp, year = year(DATE), month = month(DATE)) |> 
+  group_by(year, month)
 group_vars(aat_year_month)
 ```
 
 ## Aggregating up with `summarize`
 
 ```{r}
+summarize(aat_year_month, avg_TMAX = mean(TMAX)) |> head(3)
+
 summarize(aat_year_month, avg_TMAX = mean(TMAX)) |>
-  ggplot(aes(x = `year(DATE)` + `month(DATE)` / 12, avg_TMAX)) +
+  ggplot(aes(x = year + month / 12, avg_TMAX)) +
   geom_line()
 
 ```
+
+Note: month value is divided by 12 to get a continuous value on the x-axis
 
 ## Aggregating up two levels
 
 ```{r}
 summarize(aat_year_month, monthly_avg_tmax = mean(TMAX)) |>
-  summarize(yearly_median_monthy_mean = median(monthly_avg_tmax))
+  summarize(yearly_median_monthly_mean = median(monthly_avg_tmax))
 ```
 
-## Exercise
-
-Using the `mpg` data set, find the manufacturer (`manufacturer`) with the highest mean highway efficiency (`hwy`)
-```{r manufacturer-hwy, exercise = TRUE}
-
-```
 
 ## Arranging output
 
-Sometimes we want to choose the ordering of rows in a table. I don't use this a lot for raw data, but it can be quite helpful for summaries:
+Sometimes we want to choose the ordering of rows in a table. 
 
 ```{r}
 group_by(aatemp, year(DATE)) |> 
@@ -335,7 +421,6 @@ group_by(aatemp, year(DATE)) |>
 
 ## Descending order, multiple columns
 
-
 ```{r}
 group_by(aatemp, year(DATE)) |> 
   summarize(yearly_maxT = max(TMAX), yearly_minT = min(TMAX)) |> 
@@ -344,9 +429,26 @@ group_by(aatemp, year(DATE)) |>
 
 ## Exercise
 
-Group by both `manufacturer` and `class`. What manufacturer has the highest `cty` efficiency in the sense of the median of mean `cty` within class?
+Using the `mpg` data set, find the manufacturer (`manufacturer`) with the highest mean highway efficiency (`hwy`)
 
 ```{r manufacturer-hwy, exercise = TRUE}
+
+```
+
+```{r manufacturer-hwy-solution}
+mpg |> group_by(manufacturer) |> summarize(mean_hwy = mean(hwy)) |> arrange(-mean_hwy)
 ```
 
 
+## Exercise
+
+Group by both `manufacturer` and `class`. What manufacturer has the highest `cty` efficiency in the sense of the median of mean `cty` within class?
+
+```{r manufacturer-hwy2, exercise = TRUE}
+
+
+```
+
+```{r manufacturer-hwy2-solution}
+mpg |> group_by(manufacturer, class) |> summarize(mean_cty = mean(cty)) |> summarise(median_cty = median(mean_cty)) |> arrange(desc(median_cty))
+```

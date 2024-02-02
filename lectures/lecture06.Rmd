@@ -1,7 +1,8 @@
 ---
 title: "Stats 306: Lecture 6"
 subtitle: "More Grouping and Summaries; Functions"
-author: "Mark Fredrickson"
+author: "Jayashree Ravi"
+citation: "Content adapted from slides by Dr. Mark Fredrickson"
 output: 
   learnr::tutorial:
     progressive: true
@@ -20,7 +21,6 @@ aatemp <- read_csv("data/ann_arbor_weather.csv.gz")
 ## Review: `mutate`
 
 * `mutate`: Takes a table and returns a new table with columns added and/or subtracted
-* Give us access to columns of `tbl` without having to write `tbl$column_name`
 * `mutate(d, new_col = f(x, y), new_col2 = new_col1 + 1, old_col = NULL)`
 * `if_else(cond, true, false)` (all are vectors of same length or single values): used `TRUE` and `FALSE` values in `cond` to pick value from `true` and `false` (respectively)
 * Can use functions that summarize, e.g., `mutate(d, x_centered = x - mean(x))`
@@ -36,7 +36,6 @@ aatemp <- read_csv("data/ann_arbor_weather.csv.gz")
 ## Temperature data for Ann Arbor, MI
 
 ```{r}
-# to run this line from the console, use `setwd("lectures")` first
 aatemp
 ```
 
@@ -92,7 +91,7 @@ it was unusual for that time of year.
 ```{r}
 aat_month_centered <- group_by(aatemp, month(DATE)) |>
   mutate(TMAX_centered = TMAX - mean(TMAX, na.rm = TRUE)) # mean computed over months
-## verify as the variance should be pr
+## verify 
 summarize(aat_month_centered, var(TMAX_centered), sum(TMAX_centered^2) / (n() - 1)) |>
   head(3)
 ```
@@ -163,14 +162,35 @@ filter(mpg, manufacturer %in% at_least_2$manufacturer) |>
   arrange(v)
 ```
 
-## Other R functions
+## `rbind` and `cbind`
 
-Most other R functions do not recognize grouping:
+Take a sequence of vector, matrix or data-frame arguments and combine by rows you use `rbind`
+And to combine them by columns you use `cbind`
 
 ```{r}
-mean(aatemp$TMAX, na.rm = TRUE)
-mean(aat_year$TMAX)
-summarize(aat_year, mean(TMAX))
+t1 <- tibble(x = 1, y = 2)
+t1
+t2 <- tibble(x = 2, y = 4)
+t2
+t <- rbind(t1, t2)
+t
+cbind(t, new_col = c('a', 'b'))
 ```
+
+## Applying functions with `across`
+
+You can define your own functions and use that function to apply to specific columns using `across`
+
+Let us say you want to count the length of the string in every character column of the dataframe and create a new column with the string length value. You could do so as shown below:
+
+```{r}
+get_length <- function(x){
+  str_length(x)
+}
+
+storms |> mutate(across(where(is.character), get_length, .names = 'length_{col}')) |> head(3)
+```
+
+
 
 
