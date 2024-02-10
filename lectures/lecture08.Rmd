@@ -1,7 +1,8 @@
 ---
 title: "Stats 306: Lecture 8"
 subtitle: "Wrapping up functions"
-author: "Mark Fredrickson"
+author: "Jayashree Ravi"
+citation: "Content adapted from slides by Dr. Mark Fredrickson"
 output: 
   learnr::tutorial:
     progressive: true
@@ -21,7 +22,7 @@ library(Lahman) # install.packages("Lahman") if you don't have this
 
 * From duplicated to clean code:
   * Common patterns in function
-  * Use of `mutate_at`
+  * Use of `across`
   * Lists of functions as arguments
 * Return values: only one but can package up in vectors, lists, and tables
 * Predicates: functions that return `TRUE` or `FALSE`; use in `select`
@@ -35,20 +36,20 @@ statistics](https://www.seanlahman.com/baseball-archive/statistics). The
 
 ```{r}
 library(Lahman)
-data(package = "Lahman")
+glimpse(Batting)
 dim(Batting)
 colnames(Batting)
 ```
 
 We can look up the description of the columns using `?Batting` or the help menu.
 
-## Getting in the Lahmand data
+## Getting in the Lahman data
 
 ```{r}
-summarize(Batting, range(yearID))
+Batting$yearID |> range()
 group_by(Batting, playerID) |> 
-  summarize_at(c("G", "HR", "RBI"), sum) |>
-  arrange(desc(HR)) |> head(5)
+    summarize(across(c("G", "HR", "RBI"), sum)) |>
+    arrange(desc(HR)) |> head(5)
 ```
 
 ## From IDs to full names
@@ -69,28 +70,68 @@ lookupPlayer <- function(pid) {
 lookupPlayer(c("aaronha01", "ruthba01")) |> select(nameFirst, nameLast)
 ```
 
-## Successful players (batting)
+## `slice_max` function
 
-Which players had the most home runs? Games played? Stolen bases?
+Another way of slicing the top `n` values of any count is using `slice_max`
 
 ```{r}
-top_players <- function(stat) {
-  group_by(Batting, playerID) |>
-    summarize_at(stat, list(stat_sum = sum)) |>
-    filter(stat_sum == max(stat_sum, na.rm = TRUE)) |>
-    mutate(lookupPlayer(playerID)) |>
-    select(playerID, stat_sum, nameFirst, nameLast) |>
-    mutate(type = stat)
+Batting |> group_by(playerID) |> summarize(n = n()) |> slice_max(n = 3, n)
+```
+
+A few other variations are `slice_min`, `slice_sample`, etc. 
+
+## Dataframe function caveats
+
+A case of a problem of indirection, as dplyr uses tidy evaluation to allow you to refer to the names of variables inside your data frame without any special treatment.
+
+```{r embracing, exercise = T}
+grouped_mean <- function(df, group_var, mean_var) {
+  df %>%
+    group_by(group_var) %>%
+    summarize(mean(mean_var))
+}
+
+grouped_mean(Batting, playerID, HR)
+```
+
+Fix with embracing `{{ }}`
+
+```{r}
+grouped_mean <- function(df, group_var, mean_var) {
+  df |>
+    group_by({{ group_var }}) |>
+    summarize(mean({{ mean_var }}))
+}
+
+grouped_mean(Batting, playerID, HR) |> head()
+```
+
+
+
+## Successful players (batting)
+
+Which players had the most home runs? Games played? At bats?
+
+```{r}
+top_players <- function(stat, type) {
+  Batting |> group_by(playerID) |> 
+    summarize(total = sum({{ stat }})) |> 
+    slice_max(n = 1, total) |> 
+    mutate(lookupPlayer(playerID)) |> 
+    select(playerID, total, nameFirst, nameLast) |>
+    mutate(type = type)
 } 
 
 # rbind stacks tables
 rbind(
-  top_players("HR"),
-  top_players("G"),
-  top_players("SB"))
+ top_players(HR, "Homeruns"),
+  top_players(G, "Games"),
+  top_players(AB, "At Bats"))
+
 ```
 
-(NB: using the `list(new_col_name = summary_function)` lets us force the name of the column with the results of `summary_function`)
+
+
 
 ## Variable number of arguments
 
@@ -130,7 +171,7 @@ Write a function that takes a `...` argument and passes it along to `paste`. Set
 ```{r exdots, exercise = TRUE}
 
 
-## plus_paste("Welcome", "to", "Stats206", "and", "DataSci101")
+## plus_paste("Welcome", "to", "Stats306", "and", "R Programming")
 ```
 
 ## Common use of `...`: passing optional arguments to called functions
@@ -192,7 +233,7 @@ my_median(values_odd)
 ```{r eval = FALSE}
 
 if (values_even > 3) {
-  ... code might assume all values are larger than 3 ...
+  ... you may be trying to see if all values are larger than 3 ...
 }
 ```
 Would give the error message:
@@ -202,19 +243,6 @@ Error in if (values > 3) { : the condition has length > 1
 
 Solution: use the `any` and `all` functions
 
-## Exercise: Safe variance
-
-Recall the usual (unbiased) estimator for variance:
-
-$$\frac{\sum_{i = 1}^n (X_i - \bar X)^2}{n - 1}$$
-
-If there is only one unit in the sample, this estimator is undefined. Instead, let's estimate the variance as 0 if we only have one observation.
-
-Write a function to estimate variance in this way. Demonstrate on a vector of size 1 and a longer vector. Use `var` in the case where $n > 1$.
-
-```{r} safevar, exercise = TRUE}
-
-```
 
 ## Combining more than one condition
 
@@ -277,59 +305,23 @@ f <- function(y) {
 f(2)
 ```
 
-## Why is this useful?
 
-This can be convenient if we want to calculate a quantity and then re-use it when summarizing or mutating.
-
-Barry Bonds has hit the most homeruns. 
-```{r}
-filter(Batting, playerID == "bondsba01") |>
-  group_by(playerID) |>
-  summarize(sum(HR)) |> 
-  select(`sum(HR)`) |> first() -> bb_hr
-bb_hr
-```
-
-How many players hit at least as many triples or doubles as Bonds hit HRs?
-```{r}
-group_by(Batting, playerID) |>
-  summarize_at(c("X2B", "X3B"), sum) |>
-  transmute_at(c("X2B", "X3B"), ~(.x > bb_hr)) |>
-  summarize_all(mean)
-```
-
-How many players had at least as many hits as Bonds had HRs?
-
-```{r}
-group_by(Batting, playerID) |>
-  summarize(H = sum(H)) |>
-  transmute_at(c("H"), ~(.x > bb_hr)) |>
-  summarize_all(mean)
-```
-
-## Plotting hits
-
-```{r}
-tmp <- group_by(Batting, playerID) |>
-  summarize_at(c("H"), sum) 
-ggplot(tmp, aes(x = H)) + geom_histogram() + geom_vline(xintercept = bb_hr)
-```
 
 ## Exercise
 
 Which columns contain a value greater than 100?
 
-To find out, first, select only non-factor columns (`is.factor` will be helpful), then select the columns that have a value of at least 100 somewhere in column. Use `colnames()` to list the column names.
+To find out, first, select only numeric columns (`is.numeric` will be helpful), then select the columns that have a value of at least 100 somewhere in column. Use `colnames()` to list the column names.
 
-Then find the opposite. What columns do not have values greater than 100? Has anyone ever been hit by pitches more than 100 times in a season (column HBP)
+Then find the opposite. What columns do not have values greater than 100? 
 
 ```{r selectexercise, exercise = TRUE}
 
 ```
 
 ```{r selectexercise-solution}
-select(Batting, where(~ !is.factor(.x))) |> select(where(~ max(.x, na.rm = TRUE) > 100)) |> colnames()
+select(Batting, where(\(x) is.numeric(x))) |> select(where(\(x) max(x, na.rm = TRUE) >= 100)) |> colnames()
 
-select(Batting, where(~ !is.factor(.x))) |> select(where(~ max(.x, na.rm = TRUE) <= 100)) |> colnames()
+select(Batting, where(~ is.numeric(.x))) |> select(where(~ max(.x, na.rm = TRUE) < 100)) |> colnames()
 
 ```
