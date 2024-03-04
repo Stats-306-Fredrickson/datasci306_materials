@@ -1,7 +1,8 @@
 ---
 title: "Stats 306: Lecture 7"
-subtitle: "Writing Functions"
-author: "Mark Fredrickson"
+subtitle: "More on User Defined Functions"
+author: "Jayashree Ravi"
+citation: "Content adapted from slides by Dr. Mark Fredrickson"
 output: 
   learnr::tutorial:
     progressive: true
@@ -17,21 +18,9 @@ library(lubridate) # install.packages("lubridate") if you don't have this
 aatemp <- read_csv("data/ann_arbor_weather.csv.gz")
 ```
 
-## Using functions
-
-So far we have been using functions (sometimes called operators):
-
-```{r}
-aatemp |>
-  mutate(TRANGE = TMAX - TMIN) |>
-  summarize(
-          any(is.na(TMAX)),
-          mean(TRANGE))
-```
-
 ## Functions: mini-programs
 
-We can write our own functions. Functions are miniature programs that take inputs and return a value.
+Functions are miniature programs that take inputs and return a value.
 
 * Reuse the same set of steps in different contexts (variables, data sets)
 * Express key steps that should be done performed later (delayed computation)
@@ -50,7 +39,8 @@ aatemp |>
 
 In the previous grouping example, we used the same variables in each group to make our computation. Sometimes we want to repeat the same computation on different variables.
 
-One way of defining the *correlation coefficient* for two variables is as:
+One way of defining the *correlation coefficient* for two variables is:
+
 $$r_{xy} = \frac{1}{n - 1} \sum_{i=1}^n \frac{x_i - \bar x}{s_x} \frac{y_i - \bar x}{s_y}$$
 In other words, *the average product of Z-scores*
 
@@ -94,7 +84,7 @@ z_score(x)
 ```
 
 
-(NB: this function is called `scale` in R)
+(NB: in the last lecture we used the `scale` function instead of computing this ourselves)
 
 ## Revisiting correlation:
 
@@ -127,12 +117,15 @@ mutate(aatemp, TMAX_myscale = myscale(TMAX)) |>
     geom_violin()
 ```
 
+
 ```{r}
-aat_year <- group_by(aatemp, year(DATE))
-summarize(aat_year, myscale(TMAX)) |>
-  ggplot(aes(x = factor(`year(DATE)`), y = `myscale(TMAX)`)) +
+aatemp |> group_by(year(DATE)) |>
+  mutate(TMAX_scaled = myscale(TMAX)) |>
+  ggplot(aes(x = factor(year(DATE)), y = TMAX_scaled))+
     geom_violin()
 ```
+
+
 
 ## Exericse: Converting all Fahrenheit to Celsius
 
@@ -176,17 +169,17 @@ mutate(aatemp, TMAX_scale_IQR = scale_IQR(TMAX),
   temp_summary()
 ```
 
-## Even better: `mutate_at`
+## Even better: `across`
 
-We're still calling the function twice. `mutate_at` lets us pass in a
+We're still calling the function twice. `across` lets us pass in a
 **function** as an argument!
 
 If we give one function, it uses the original column names:
 
 ```{r}
-mutate_at(aatemp, c("TMAX", "TMIN"), scale_IQR) |>
-  group_by(abs(TMAX) > 1.5, abs(TMIN) > 1.5) |>
-  summarize(n())
+mutate(aatemp, across(c("TMAX", "TMIN"), scale_IQR)) |>
+    group_by(abs(TMAX) > 1.5, abs(TMIN) > 1.5) |>
+    summarize(n())
 ```
 
 ## More than one function, giving them names
@@ -197,8 +190,8 @@ list(name1 = function1, name2 = function2)
 ```
 
 ```{r}
-mutate_at(aatemp, c("TMAX", "TMIN"), 
-          list(scale_IQR = scale_IQR, scale = scale)) |>
+mutate(aatemp, across(c("TMAX", "TMIN"), 
+          list(scale_IQR = scale_IQR, scale = scale))) |>
   colnames()
             
 ```
@@ -210,7 +203,7 @@ mutate_at(aatemp, c("TMAX", "TMIN"),
 $$ \frac{(1/n) \sum_{i=1}^n (X_i - \bar X_n)^3}{\hat \sigma^3}$$
 where $\hat \sigma$ is the sample standard deviation.
 
-Write a function to compute the coefficient of skew and use `summarize_at` to compute it for `TMAX` and `TMIN` in the `aatemp` data set.
+Write a function to compute the coefficient of skew and use `across` to compute it for `TMAX` and `TMIN` in the `aatemp` data set.
 
 ```{r coefskew, exercise = TRUE}
 
@@ -221,7 +214,8 @@ skew <- function(x) {
    mean((x - mean(x))^3) / sd(x)^3
 }
 
-summarize_at(aatemp, c("TMAX", "TMIN"), skew)
+
+summarize(aatemp, across(c("TMAX", "TMIN"), skew))
 ```
 
 ## Return values
@@ -254,7 +248,7 @@ aat_year <- group_by(aatemp, year(DATE))
 summarize(aat_year, mean_var(TMAX))
 ```
 
-Use caution when using this function more than once!
+Use caution when using this function more than once! Now what are these values we got??
 
 ```{r}
 summarize(aat_year, mean_var(TMAX), mean_var(TMIN))
@@ -282,7 +276,7 @@ We have seen several predicates used already: `is.numeric` or `is.character` in 
 select(aatemp, where(no_missing)) |> colnames()
 ```
 
-## Anonymous functions
+## More on anonymous functions
 
 Sometimes we want to write short little functions that only get used once. We call these **anonymous functions** like this:
 
@@ -299,11 +293,17 @@ select(aatemp, where(~ !any(is.na(.x)))) |> ncol()
 ```
 
 >* `~` starts a formula
->* `.x` and `.y` are the arguments to the function
+>* `.x` is the argument to the function
+
+Another form using backslash
+
+```{r}
+select(aatemp, where(\(x) !any(is.na(x)))) |> ncol()
+```
 
 We'll see more of this form when we discuss iteration.
 
-## More function short hand
+**More function short hand**
 
 ```{r}
 summarize_at(aatemp, c("TMAX", "TMIN"), ~ mean((.x - mean(.x))^3) / sd(.x)^3)
@@ -331,11 +331,11 @@ mutate(aatemp, TMAX1 = multSomething(TMAX),
 ## Some functions allow passing additional arguments indirectly
 
 ```{r}
-mutate_at(aatemp, c("TMAX", "TMIN"), multSomething, to_mult = 0) |>
+mutate(aatemp, across(c("TMAX", "TMIN"), \(x) multSomething(x, to_mult = 0))) |>
   select(TMAX, TMIN)
 ```
 
-This is done using the `...` argument to `mutate_at`.
+
 
 ## Exercise
 
@@ -358,4 +358,3 @@ center(myvec)
 center(myvec, mean)
 center(myvec, f = median)
 ```
-
