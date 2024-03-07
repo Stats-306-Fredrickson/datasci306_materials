@@ -1,6 +1,6 @@
 ---
 title: "Stats 306: Lab 7"
-author: "Yilei Zhang"
+author: ""
 output: 
   learnr::tutorial:
     progressive: true
