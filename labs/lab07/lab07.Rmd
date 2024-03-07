@@ -1,29 +1,24 @@
 ---
-title: "Stats 306: Lab 7"
+title: "lab07"
 author: "your name"
-output: 
-  learnr::tutorial:
-    progressive: true
-runtime: shiny_prerendered
+date: "3/6/2024"
+output: html_document
 ---
 
 ## Set up
 
-```{r installPackages, echo=FALSE, include=FALSE, message=FALSE}
+```{r installPackages}
 # This just checks if students need to install some packages that they might 
 # not have.
 
 if (!require(nycflights13)) install.packages("nycflights13", repos = "http://cran.us.r-project.org")
-if (!packageVersion("learnr") == "0.11.1") install.packages("learnr", repos = "http://cran.us.r-project.org")
 ```
 
 ```{r setup, eval=TRUE, include=FALSE, message=FALSE, echo=FALSE}
-library(learnr)     # For interactive exercises
 library(tidyverse)  # For ggplot2, dplyr, readr
 library(lubridate)  # For some functions involving dates
 library(nycflights13)
 
-tutorial_options(exercise.reveal_solution = FALSE)
 ```
 
 ```{r fake_setup, echo=TRUE, eval=FALSE}
@@ -76,9 +71,9 @@ d3 <- "01/24, '11 2:01 PM EST"
 ```
 
 ```{r dates1-hint-2}
-out1 <- parse_date(d1, format = ...)
-out2 <- parse_date(d2, format = ...)  # You could also use lubridate::mdy
-out3 <- parse_date(d3, format = ...)
+# out1 <- parse_date(d1, format = ...)
+# out2 <- parse_date(d2, format = ...)  # You could also use lubridate::mdy
+# out3 <- parse_date(d3, format = ...)
 ```
 
 ## Creating dates from individual components
@@ -151,13 +146,10 @@ Once a column is a stored as a `Date` object in `R`, it's relatively simple to p
 
 **Exercise**: Use `mutate` to create a new dataset called `weather_dates` that contains a `datetime` column called `time` that represents the year, month, day and hour of each observation in the weather dataset (note that a similar column called `time_hour` already exists in the dataset, so this is just for practice). 
 
-```{r weatherDates, exercise=TRUE, exercise.blanks = "\\.\\.\\.+", exercise.setup="weatherdata"}
-weather_dates <- weather |> ...
-```
 
 ```{r weatherDates-hint}
-weather_dates <- weather |> 
-  mutate(time = make_datetime(...))
+# weather_dates <- weather |> 
+  # mutate(time = make_datetime(...))
 ```
 
 
@@ -169,10 +161,10 @@ weather_dates <- weather |>
 
 ```{r weatherPlot-hint}
 # Because there are three locations, we need to tell ggplot which group each time series comes from. We can do this by adding a facet, or specifying the group argument of aes for geom_line: 
-weather_dates |>
-  ggplot(...) + 
-  geom_line(aes(..., group = origin)) + 
-  ...
+# weather_dates |>
+  # ggplot(...) + 
+  # geom_line(aes(..., group = origin)) + 
+  
 ```
 
 ## Modifying the appearance of dates on the x-axis. 
@@ -186,20 +178,17 @@ In this case, we wouldn't need to display the year for each break.
 Then, recreate the figure from the previous slide, but this time make breaks come every month and don't display the year. 
 Also, add a plot title so that people know what they data are. 
 
-```{r changeDates, exercise=TRUE, exercise.setup="weatherDates-solution"}
-weather_dates |>
-```
 
 ```{r changeDates-hint-1}
-weather_dates |>
-  filter(...) |> 
-  ggplot(...) + 
-  ... + 
-  scale_x_datetime(date_breaks = ..., date_labels = ...)
+#weather_dates |>
+  #filter(...) |> 
+  #ggplot(...) + 
+  #... + 
+  #scale_x_datetime(date_breaks = ..., date_labels = ...)
 ```
 
 ```{r changeDates-hint-2}
-scale_x_datetime(date_breaks = ..., date_labels = ...)
+# scale_x_datetime(date_breaks = ..., date_labels = ...)
 
 # The date_breaks argument above takes a string input like "1 year", that will make major breaks every year. 
 # The date_labels argument uses syntax similar to parsing data, for example, 
@@ -319,18 +308,18 @@ huron_level$year[strange_diff + 1]
 **Exercise**: Let's use some of the skills that we learned with *Dates* and *pivoting* to create a *long* version of this dataset, with a column `time` containing a `Date` object for the first day of the specified month, and a `level` column representing the water level in meters. 
 
 ```{r cleanHuron, exercise=TRUE, exercise.blanks = "\\.\\.\\.+",  exercise.setup="loadHuron"}
-cleanHuron <- huron_level |> ...
+# cleanHuron <- huron_level |> ...
 ```
 
 ```{r cleanHuron-hint-1}
 # Pivot first, then mutate:
-cleanHuron <- huron_level |>
-  pivot_longer(
-    cols = ..., 
-    names_to = ..., 
-    values_to = ...
-  ) |> 
-  mutate(...)
+# cleanHuron <- huron_level |>
+  # pivot_longer(
+    # cols = ..., 
+    # names_to = ..., 
+    # values_to = ...
+  # ) |> 
+  # mutate(...)
 ```
 
 ```{r cleanHuron-hint-2}
@@ -342,7 +331,3 @@ cleanHuron <- huron_level |>
 
 **Exercise**: Finally, let's plot the data over time. Once you've been able to plot the data, experiment with modifying the appearance of the `x-axis` using `scale_x_datetime` to something that you think looks good. 
 You may want to consider looking at the help page `?strptime` for ideas. 
-
-```{r plotHuron, exercise=TRUE,  exercise.setup="loadHuron"}
-
-```
