@@ -1,0 +1,470 @@
+---
+title: "lab07 Joins"
+author: "Your Name"
+date: "2024-03-09"
+output: pdf_document
+---
+
+
+```{r setup, echo=FALSE, include=FALSE}
+library(tidyverse)
+```
+
+
+# Joins
+
+This section of this lab is about **joins**.
+
+### Overview
+
+In data science, we often find that related information is spread across
+multiple data tables. A good example of this is the data from the
+`nycflights13` package. As you've seen in lecture, there are actually
+five related tables in `nycflights13`: (1) `flights`, (2) `weather`, (3)
+`planes`, (4) `airlines`, and (5) `airports`.
+
+We may want to analyze data from two, three, four, or even all five of
+these data frames at the same time, as this would allow us to uncover
+patterns and relationships that we could not observe in each one
+individually. For example, how are flights affected by weather? Do
+different airports and airlines react differently to bad weather
+conditions?
+
+Fortunately, there are certain variables (i.e., **keys**) that appear in
+more than one of the `nycflights13` data tables and uniquely identify
+observations in at least one of them. We can use these variables to
+**join** the tables together. There are a few different types of joins
+--- here's a hierarchy of all of them:
+
+-   Mutating joins
+    -   Inner joins
+        -   `inner_join()`
+    -   Outer joins
+        -   `full_join()`
+        -   `left_join()`
+        -   `right_join()`
+-   Filtering joins
+    -   Semi-joins
+        -   `semi_join()`
+    -   Anti-joins
+        -   `anti_join()` 
+
+
+### Load in the data
+
+
+We're going to take a break from `nycflights13` in this lab. Instead,
+we'll work with some of the baseball data frames from the `Lahman`
+package: 
+
+[Lahman
+documentation](https://cran.r-project.org/web/packages/Lahman/Lahman.pdf)
+
+```{r}
+# install.packages("Lahman")
+library(Lahman)
+```
+We'll mostly be working with the `People`, `Batting`, and `Salaries`
+data frames. 
+
+### Keys
+
+A key is a variable that connects a pair of data frames and allows us to
+join them together. More specifically,
+
+-   A **primary key** is a variable (or set of variables) that uniquely
+    identifies each observation.
+    -   There is at most one row in the table that corresponds to a
+        particular value of the primary key.
+    -   Sometimes the observations in a table are uniquely identified by
+        more than one variable --- in this case, the set of uniquely
+        identifying variables is called a **compound key**.
+-   A **foreign key** is a variable (or set of variables) that
+    corresponds to a primary key in another table.
+    -   In a well-designed database, primary keys and their
+        corresponding foreign keys have the same names.
+
+Let's look at some examples.
+
+In the `People` data frame, each row is uniquely identified by
+`playerID`, so `playerID` is a **primary key** for `People`. One way to
+check this is to count the number of rows in the table for each
+`playerID` and then filter to rows where $n > 1$. If we've correctly
+identified the primary key, then we will find no `playerID`s for which
+$n > 1$:
+```{r}
+People %>%
+  head(5)
+```
+
+```{r}
+People %>%
+    count(playerID) %>%
+    filter(n > 1)
+```
+
+There's also a `playerID` column in the `Batting` table. We say that
+`Batting$playerID` is a **foreign key** for `People$playerID` since each
+`playerID` in `Batting` corresponds to one `playerID` in `People`.
+
+However, `playerID` is *not* a primary key for `Batting`. For some
+`playerID`s, there are multiple rows in `Batting`:
+```{r}
+Batting %>%
+  head(5)
+```
+
+
+```{r}
+Batting %>%
+    count(playerID) %>%
+    head(5)
+```
+
+
+This makes sense because each row in `Batting` contains the statistics
+for one player in one season, and most players' careers last longer than
+just one season.
+
+
+So what is the primary key for `Batting`? After reading through the
+Lahman documentation,
+we can infer that each row in `Batting` is uniquely identified by the
+combination of `playerID`, `yearID`, and `stint`. These three variables
+form a **compound key**, and this compound key is a primary key for
+`Batting`:
+
+```{r}
+Batting %>%
+    count(playerID, yearID, stint) %>%
+    filter(n > 1)
+```
+
+### Mutating joins
+
+Now that we've seen how the tables in the `Lahman` database are
+connected by keys, we can practice using joins to actually connect them.
+
+The first category of joins you should know about are **mutating
+joins**, which match observations between two data frames and then
+$\underline{\text{add variables}}$ from one data frame to the other.
+There are four types of mutating joins: (1) inner, (2) left, (3) right,
+and (4) full. The latter three are often called outer joins.
+
+#### Mutating join #1: `inner_join()`
+Suppose we have two data frames **x** and **y**.
+
+**`inner_join(x, y)`** preserves all rows in **x** that have a matching
+key in **y**, and it adds the columns of **y** to **x**.
+
+Let's test this out with the `Batting` and `Salaries` data frames. Note
+that `Batting` has 112,184 rows and 22 columns, while `Salaries` has
+26,428 rows and 5 columns:
+
+```{r}
+glimpse(Batting)
+glimpse(Salaries)
+```
+
+
+Note also that there are four overlapping columns between these two data
+frames: `yearID`, `teamID`, `lgID`, and `playerID`.
+
+```{r}
+bs_inner <- Batting %>%
+    inner_join(Salaries)
+head(bs_inner)
+# Equivalently:
+# inner_join(Batting, Salaries)
+```
+
+```{r}
+dim(bs_inner)
+```
+
+The resulting table has 25,441 rows (note that this is less than the
+number of rows in each of the original data frames). It has 23 columns
+--- the 22 columns in `Batting` plus the one column in `Salaries` that
+does not also appear in `Batting`.
+
+Notice that the function automatically joined the two data frames by the
+overlapping columns listed above --- this is called a **natural join**.
+The four overlapping columns form a compound key.
+
+Natural joins usually give us what we want, but they don't work well if
+
+1.  A column in **x** has the same name as a column in **y** but the two
+    columns measure something different or
+2.  A column in **x** measures the same thing as a column in **y** but
+    the two columns have different names.
+
+In this case, the natural join works well. To manually set the key
+(which is not necessary in this example), we can use the `by` argument:
+
+```{r}
+bs_inner2 <- Batting %>%
+    inner_join(Salaries, by = c("playerID", "yearID", "teamID", "lgID"))
+head(bs_inner2)
+```
+
+#### Mutating join #2: `left_join()`
+
+**`left_join(x, y)`** preserves all rows in **x**, and it adds the
+columns of **y** to **x**.
+
+```{r}
+bs_left <- Batting %>%
+    left_join(Salaries)
+head(bs_left)
+```
+```{r}
+dim(bs_left)
+```
+
+The resulting table has 112,184 rows, which is the same number of rows
+as `Batting`. This makes sense, as left joins preserve all the rows in
+the left-hand data frame.
+
+It also has 23 columns, just like the `inner_join()` table above. This
+also makes sense --- we should get the same number of columns for all of
+these mutating joins since we are just adding the (unique) columns of
+`Salaries` to `Batting`.
+
+Notice that there are a lot of `NA`s in the salary column. This is
+because the `Batting` table records data from 1871-2022, but 
+`Salaries` only records data from 1985-2016:
+
+```{r}
+Batting %>%
+  distinct(yearID) %>%
+  pull(yearID)
+```
+
+```{r}
+Salaries %>%
+  distinct(yearID) %>%
+  pull(yearID)
+```
+
+```{r}
+Batting %>%
+    left_join(Salaries) %>%
+    group_by(yearID) %>%
+    summarize(prop_NA = mean(is.na(salary))) %>%
+    filter(prop_NA < 1) %>%
+    pull(yearID) # List of years where at least some salaries were recorded
+```
+
+
+#### Mutating join #3: `right_join()`
+
+
+**`right_join(x, y)`** preserves all rows in **y**, and it adds the
+columns of **y** to **x**.
+
+Here's what a right join looks like for `Batting` and `Salaries`:
+
+```{r}
+bs_right <- Batting %>%
+    right_join(Salaries)
+head(bs_right)
+# Equivalently:
+# right_join(Batting, Salaries)
+
+# # Also equivalent:
+# left_join(Salaries, Batting)
+```
+
+```{r}
+bs_right2 <- Batting %>%
+    right_join(Salaries) %>%
+    count(playerID, yearID, teamID, lgID, sort = TRUE)
+head(bs_right2)
+```
+
+```{r}
+dim(bs_right)
+```
+
+
+The resulting data frame has 26,437 rows, which is almost the same
+number of rows as `Salaries`. And once again, it has 23 columns.
+
+This time, we see a lot of missing batting statistics toward the bottom
+of the table. This is because `Salaries` records data for both batters
+and pitchers, but `Batting` only records data for batters.
+
+
+#### Mutating join #4: `full_join()`
+
+**`full_join(x, y)`** preserves all rows in **x** and **y**, and it adds
+the columns of **y** to **x**. 
+```{r}
+bs_full <- Batting %>%
+    full_join(Salaries)
+head(bs_full)
+# Equivalently:
+# full_join(Batting, Salaries)
+```
+
+```{r}
+dim(bs_full)
+```
+
+
+The resulting table has 23 columns and 113,180 rows, which is more than
+the number of rows in either of the original data frames. More
+specifically, 113,180 is equal to the following:
+```{r}
+26437 +       # Number of rows in right_join
+  112184 -  # Number of rows in left_join
+  25441     # Number of rows in inner_join
+```
+
+
+#### Filtering join #1: `semi_join()`
+
+
+**`semi_join(x, y)`** preserves all rows in **x** that have a matching
+key in **y**. It's kind of like an inner join except it doesn't add any
+of the columns from **y**.
+
+For example, here's a semi-join for `Batting` and `Salaries`:
+
+```{r}
+bs_semi <- Batting %>%
+    semi_join(Salaries)
+head(bs_semi)
+# Equivalently:
+# semi_join(Batting, Salaries)
+```
+
+```{r}
+dim(bs_semi)
+```
+
+This gives us a data frame with the same 22 columns as `Batting`, but
+only 25,441 rows (as opposed to the 112,184 rows in `Batting`).
+
+
+
+#### Filtering join #2: `anti_join()`
+
+
+**`anti_join(x, y)`** preserves all rows in **x** that do not have a
+matching key in **y**. It does not add any of the columns from **y**.
+
+Let's try an anti-join with `Batting` and `Salaries`:
+
+```{r}
+bs_anti <- Batting %>%
+    anti_join(Salaries)
+head(bs_anti)
+# Equivalently:
+# anti_join(Batting, Salaries)
+```
+
+```{r}
+dim(bs_anti)
+```
+
+Similar to the semi-join from above, we get a data frame with the same
+22 columns as `Batting`. However, the anti-join table has 86,743 rows.
+This means that 86,743 rows in `Batting` have no matching key in
+`Salaries`, and the remaining 25,441 rows in `Batting` have at least one
+matching key in `Salaries`.
+
+### Exercise 1
+
+**`Batting` contains single-season batting statistics for individual
+batters. `Salaries` contains single-season salary information for
+individual players. `People` contains demographic information about
+individual players, including their name and where they are from.**
+
+**Using the information in these three data frames, create a scatterplot
+where the x-axis is `salary` and the y-axis is `HR` (home runs). Include
+only data from the 1998 season for batters who played at least 100 games
+(`G >= 100`) and who were born in either the United States (USA) or the
+Dominican Republic (D.R.).**
+
+**BONUS: There are only four players in this scatterplot who hit at
+least 40 home runs and made at least \$7,500,000 in 1998. Can you find
+their first and last names?**
+
+```{r}
+
+```
+
+
+
+**SOLUTION**
+```{r}
+
+table <- Batting %>%
+            inner_join(Salaries) %>%
+            inner_join(People) %>%
+            filter(yearID == 1998, birthCountry %in% c("USA", "D.R."), G >= 100)
+
+table %>%
+    ggplot() +
+    geom_point(aes(x = salary, y = HR),
+                   col = "darkslategray", fill = "cornflowerblue",
+                   size = 3, stroke = 1.5, shape = "circle filled") +
+    theme_bw() +
+    ggtitle("Home runs vs. salary for US and DR players in 1998") +
+    xlab("Salary") + ylab("Home runs")
+
+table %>% filter(salary > 7500000, HR > 40) %>% select(nameFirst, nameLast, HR, salary)
+```
+
+
+
+### Exercise 2
+
+**At the end of every baseball season, Gold Glove awards are handed out
+to the best defensive players at each position. This information, along
+with other awards data, is stored in the `AwardsPlayers` data frame. The
+following code creates a tibble of the `playerID`s of players who have
+won a Gold Glove since 1950:**
+
+```{r}
+gold_gloves <- AwardsPlayers %>%
+                filter(awardID == "Gold Glove", yearID >= 1950) %>%
+                select(playerID)
+```
+
+**The `People` data frame contains demographic information about
+individual players, including their birth months. Filter `People` to
+only players who have won a Gold Glove award. What is the most common
+birth month of these Gold Glove winners? The least common?**
+
+**BONUS: Filter `People` to only players who have *not* won a Gold Glove
+award. What is the most common birth month of these non-Gold Glove
+winners? The least common?**
+
+
+```{r}
+
+```
+
+
+**SOLUTION**
+```{r}
+#@title Solution to exercise 2
+
+People %>%
+    semi_join(gold_gloves) %>%
+    filter(!is.na(birthMonth)) %>%
+    group_by(birthMonth) %>%
+    summarize(n = n()) %>%
+    arrange(desc(n))
+# Most common is April, least common is February
+
+People %>%
+    anti_join(gold_gloves) %>%
+    filter(!is.na(birthMonth)) %>%
+    group_by(birthMonth) %>%
+    summarize(n = n()) %>%
+    arrange(desc(n))
+# Most common is August, least common is June
+```
