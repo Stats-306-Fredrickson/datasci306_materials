@@ -22,7 +22,7 @@ library(lubridate)
 library(tidyverse)  # For ggplot2, dplyr, readr
 library(nycflights13)
 
-tutorial_options(exercise.reveal_solution=T)
+tutorial_options(exercise.reveal_solution=FALSE)
 ```
 
 ```{r fake_setup, echo=TRUE, eval=FALSE}
@@ -36,8 +36,9 @@ library(nycflights13)
 ## Today's Content
 
 - Strings
-- Data Imports
-- Dates
+- EDA and Data Imports
+- Tidy Data and Dates
+- Table and Relational Data
 
 
 
@@ -89,7 +90,9 @@ str_split("lions, tigers, bears, oh my!", pattern = ", ")
 LETTERS[-1]
 ```
 
-
+```{r str_c-solution}
+str_c(LETTERS[-26], "precedes", LETTERS[-1], sep = " ")
+```
 
 ### Regular Expressions
 
@@ -133,7 +136,50 @@ fielder Kole Calhoun with one of the three best outfielders in baseball this yea
 str_extract_all(...)
 ```
 
+```{r regex-solution}
+str_extract_all(baseball, "th(e|is)")
+str_extract_all(baseball, "(t|T)h(e|is)") # including capitalized T
+```
 
+## EDA
+- In the previous labs, we learned about variation (for a single variable) and covariation (for two or more variables)
+
+- We learned how to visualize univariate distributions depending on the type of variable:
+  + Categorical/Discrete Variables - `geom_bar()`, `geom_col()` and pie charts
+  + Continuous - `geom_histogram()`, `geom_density()`, `geom_freqpoly()`
+  
+- For bivariate distributions we looked at a combination of variable types:
+  + Continuous-continuous - `geom_point()`, `geom_contour()`
+  + Continuous-Discrete (also known as conditional distributions) - `geom_boxplot()`, `geom_violin()`
+  + Discrete-discrete - `geom_count()`, `geom_tile()`
+  
+Let us answer the following question   
+
+
+**Exercise** Using the `iris` dataset, use an appropriate plot to explore the relationship between `Sepal.Length` and `Sepal.Width`. What do you learn about this plot for the various `Species`?
+```{r iris, exercise = TRUE}
+## YOUR CODE HERE
+```
+
+```{r iris-hint}
+# (a) What variable types are we exploring?
+# (b) What would be an appropriate plot to visualize the relationship
+# (c) How do you condition on `species`?
+```
+
+```{r iris-solution}
+iris %>%
+  ggplot(aes(x = Sepal.Length, y = Sepal.Width, col = Species)) +
+  geom_point() +
+  theme_bw()
+
+#%%%%%%%%%%%%%% Observations %%%%%%%%%%
+# From the above plot, we can infer that:
+
+# (1) Species Setosa has smaller sepal lengths but larger sepal widths.
+# (2) Versicolor Species lies in the middle of the other two species in terms of sepal length and width
+# (3) Species Virginica has larger sepal lengths but smaller sepal widths.
+```
 
 
     
@@ -240,6 +286,56 @@ read_csv2("a;b\n1;3")
 
 
 
+## Tidy Data
+
+Remember that often we have data that is already "tidy". This means that every row corresponds to an observation, every column is a variable, and every cell is a value (see table below).
+
+<center>
+
+![Illustration of tidy data, from the R for Data Science book book](images/tidyData.png){width=100%}
+
+</center>
+
+It's possible, however, that we have untidy data. This happens when 
+
+**Exercise:** Why are we interested in having `tidy` data? (There are several possible solutions to this very open-ended question). 
+
+```{r tidyQ, exercise=TRUE}
+# You don't need to put anything here, it's just a placeholder for the solution
+```
+
+```{r tidyQ-solution}
+# There are many reasons why we might want to have tidy data, but according to Hadley Whickam (R4DS textbook):
+# 
+# 1. There’s a general advantage to picking one consistent way of storing data. If you have a consistent data structure, it’s easier to learn the tools that work with it because they have an underlying uniformity.
+
+# 2. There’s a specific advantage to placing variables in columns because it allows R’s vectorised nature to shine. As you learned in mutate and summary functions, most built-in R functions work with vectors of values. That makes transforming tidy data feel particularly natural.
+```
+
+**Exercise:** Is the dataset below in `tidy` format? If not, how can we fix it? 
+
+```{r huronLevel, exercise=TRUE}
+huron_level <- read_csv("data/huron_level.csv", comment = "#")
+head(huron_level)
+```
+
+```{r huronLevel-hint-1}
+# Look at the names of the columns. Are these names really variables of an observation, or are they instead times when observations are obtained? 
+```
+
+```{r huronLevel-hint-2}
+# The data here seems like they are too "wide": each column really identifies a month and not a new variable! Maybe we should make the data "longer"... 
+```
+
+```{r huronLevel-solution}
+huron_level %>%
+  pivot_longer(
+    cols = -year, 
+    names_to = "month_abb",
+    values_to = "water_level"
+  )
+```
+
 ## Dates 
 
 Dates are a common and tricky data type that we need to deal with often. Here are some things that we need to consider when working with dates: 
@@ -275,6 +371,109 @@ d3 <- "Nov 7, 7:49 PM"
 # Which do you think will be useful? 
 ```
 
+```{r convertDates-solution}
+d1 <- "Jan 01, 2019"
+d2 <- "11-28-95"
+d3 <- "November 07, '04, 10:04 PM"
+
+# One possbile solution
+readr::parse_date(d1, format = "%b %d, %Y")
+lubridate::mdy(d2)
+readr::parse_datetime(d3, "%B %d, '%y, %H:%M %p")
+```
 
 
+
+
+## Tables
+
+We introduced our **model of rectangular data** as **lists of vectors**. 
+
+There are several R classes that implement this idea:
+
+>* `matrix`: all vectors of same type
+>* `data.frame`: vectors of different types, fewer ammenities
+>* `tibble`: vectros of different types, more features
+>* `data.table`: for data too large to fit in memory
+
+
+## Relational Data
+
+### Inner Join
+
+![](images/join-inner.png){width=90%}
+
+
+The simplest type of join is the inner join. An inner join matches pairs of observations whenever their keys are equal. The output of an inner join is a new data frame that contains the key, the x values, and the y values. 
+
+### Outer Joins
+
+An inner join keeps observations that appear in both tables. An outer join keeps observations that appear in at least one of the tables. There are three types of outer joins:
+
+* A left join keeps all observations in x.
+* A right join keeps all observations in y.
+* A full join keeps all observations in x and y.
+
+These joins work by adding an additional “virtual” observation to each table. This observation has a key that always matches (if no other key matches), and a value filled with NA.
+
+Graphically, that looks like:
+
+![](images/join-outer.png){width=90%}
+
+### Semi-join
+
+`semi_join(x, y)` keeps all the observations in `x` that are also in `y`.
+
+![](images/join-semi.png){width=90%}
+
+
+### Anti-join
+
+The opposite of a semi-join is an anti-join: keeps all the observations in `x` that are not in `y`.
+
+![](images/join-anti.png){width=90%}
+
+## Keys
+
+The variables used to connect each pair of tables are called keys. A key is a variable (or set of variables) that uniquely identifies an observation.
+
+There are two types of keys:
+
+* A primary key uniquely identifies an observation in its own table. For example, planes$tailnum is a primary key because it uniquely identifies each plane in the planes table.
+
+* A foreign key uniquely identifies an observation in another table. For example, flights$tailnum is a foreign key because it appears in the flights table where it matches each flight to a unique plane.
+
+A variable can be both a primary key and a foreign key. For example, origin is part of the weather primary key, and is also a foreign key for the airports table.
+
+If a table lacks a primary key, it’s sometimes useful to add one with mutate() and row_number(). That makes it easier to match observations if you’ve done some filtering and want to check back in with the original data. This is called a surrogate key.
+
+A primary key and the corresponding foreign key in another table form a relation. Relations are typically one-to-many. For example, each flight has one plane, but each plane has many flights. In other data, you’ll occasionally see a 1-to-1 relationship. You can think of this as a special case of 1-to-many. 
+
+### Exercises
+
+What’s the primary key in the flights table? You might think it would be the date plus the flight or tail number. Check the two assumptions by the function `count()`
+
+```{r primaryKey, exercise=TRUE}
+
+```
+
+```{r primaryKey-hint}
+flights %>% 
+  count(...) %>% 
+  filter(n > 1)
+```
+
+```{r primaryKey-solution}
+flights %>% 
+  count(year, month, day, flight) %>% 
+  filter(n > 1)
+
+flights %>% 
+  count(year, month, day, tailnum) %>% 
+  filter(n > 1)
+```
+
+### Solution
+
+Neither of those variable combinations are unique. The table `flights` doesn’t have an explicit primary key: each row is an observation, but no combination of variables reliably identifies it.
 
