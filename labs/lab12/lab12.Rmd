@@ -12,372 +12,480 @@ runtime: shiny_prerendered
 ```{r installPackages, echo=FALSE, include=FALSE, message=FALSE}
 # This just checks if students need to install some packages that they might 
 # not have.
-
-if (!require(bench))
-  install.packages("bench", repos = "http://cran.us.r-project.org")
-
-if (!require(parallel))
-  install.packages("parallel", repos = "http://cran.us.r-project.org")
-
-if (!require(doParallel))
-  install.packages("doParallel", repos = "http://cran.us.r-project.org")
-
-if (!require(foreach))
-  install.packages("foreach", repos = "http://cran.us.r-project.org")
+if (!require(shiny))
+  install.packages("shiny", repos = "http://cran.us.r-project.org")
 ```
 
 ```{r setup, eval=TRUE, include=TRUE, message=FALSE, echo=TRUE}
 library(learnr)     # For interactive exercises
-library(purrr)
-library(dplyr)
-library(ggplot2)
-library(bench)
-library(parallel)
-library(foreach)
-library(doParallel)
+library(tidyverse)
+library(shiny)
 ```
+
 
 ```{r, include=FALSE, message=FALSE, echo=FALSE}
 tutorial_options(exercise.reveal_solution=FALSE)
 ```
 
+
 ## Today's Content
 
-- Debugging Review
-- Performance Evaluation in `R` 
-- Brief intro to parallelization in `R` 
+- Basics of Shiny.
 
-## Debugging Review 
+## Basics of Shiny
 
-As you've likely seen many times this semester, incorrect `R` code can sometimes result in an *Error* message. 
-When this happens, we say that `R` *throws* an error. 
+Every Shiny app has two key components: the **UI** (short for user interface) which defines how your app looks, and the **server function** which defines how your app works. Shiny uses reactive programming to automatically update outputs when inputs change, so we’ll need the third important component of Shiny apps: **reactive expressions**. 
 
-**Example:**
+### Create app directory and file
 
-```{r varianceFun, error=TRUE}
-variance(rnorm(100))
-```
+There are several ways to create a Shiny app. The simplest is to create a new directory for your app, and put a single file called app.R in it. This app.R file will be used to tell Shiny both how your app should look, and how it should behave. Try it out by adding an app.R file that looks like this:
 
-Often the error message will help us find what is wrong with our code. This is the case above, where the error message tells us that the function `variance` could not be found. 
-Sometimes, however, the error message is not as informative. 
+```{r, eval=FALSE, echo=TRUE}
+ui <- fluidPage(
+  "Hello, world!"
+)
 
-**Example:**
-
-```{r lmMean, error=TRUE}
-lm(mean)
-```
-
-As outlined in the [Advanced R](https://adv-r.hadley.nz/debugging.html) textbook, a good strategy to help identifying and fixing errors is the following: 
-
-> (1) **Google!**: 
-> (2) **Make it Repeatable**
-> (3) **Figure out where it is**
-> (4) **Fix it and test it** 
-
-**Example: Make it Repeatable.** Let's say that we want to create a random variable in the following 
-way: 
-
-- Sample $X_i \sim N(3, 1)$ distribution, for $i \in 1:100$
-- Set $Y_i = log(X_i)$ for each $i$, 
-- If $Y_i < 0$, set $Y_i = 0$.
-
-We implement this strategy for sampling $Y$ below. 
-
-```{r}
-x <- rnorm(100, mean = 3, sd = 1)
-log_x <- log(x)
-for (i in 1:length(x)) {
-  if (log_x[i] < 0) {
-    log_x[i] <- 0
-  }
+server <- function(input, output, session) {
 }
 
-hist(log_x)
+shinyApp(ui, server)
+```
+This is a complete, if trivial, Shiny app! Looking closely at the code above, our app.R does four things:
+
+- It calls `library(shiny)` to load the shiny package.
+
+- It defines the user interface, the HTML webpage that humans interact with. In this case, it’s a page containing the words “Hello, world!”.
+
+- It specifies the behaviour of our app by defining a server function. It’s currently empty, so our app doesn’t do anything, but we’ll be back to revisit this shortly.
+
+- It executes `shinyApp(ui, server)` to construct and start a Shiny application from UI and server.
+
+*RStudio Tip: If you’ve already created the app.R file, you can quickly add the app boilerplate by typing “shinyapp” and pressing Shift+Tab.*
+
+### Running
+
+There are a few ways you can run this app:
+
+- Click the Run App (Figure 1.1) button in the document toolbar.
+
+- Use a keyboard shortcut: Cmd/Ctrl + Shift + Enter.
+
+![](images/run-app.png){width=80%}
+
+Pick one of these options, and check that you see the same app as in the following figure. Congratulations! You’ve made your first Shiny app.
+
+![](images/hello-world.png){width=80%}
+
+## Adding UI controls and behavior
+
+### UI controls
+
+Now we’re going to make a very simple app that shows you all the built-in data frames included in the datasets package.
+
+Replace your ui with this code:
+
+```{r, eval=F, echo=T}
+
+ui <- fluidPage(
+  selectInput("dataset", label = "Dataset", choices = ls("package:datasets")),
+  verbatimTextOutput("summary"),
+  tableOutput("table")
+)
+
 ```
 
-Note that sometimes this results in an error, but usually it doesn't! This makes 
-it really difficult to debug! 
-For this particular problem, it might be easy to find the bug, but this example illustrates how getting a reproducible error (step 2) can help us find the bug. 
+This example uses four new functions:
 
-### Exercise:
+- `fluidPage()` is a **layout function** that sets up the basic visual structure of the page. 
 
-Set the reproducible seed number so that the code below results in an error. 
+- `selectInput()` is an **input control** that lets the user interact with the app by providing a value. In this case, it’s a select box with the label “Dataset” and lets you choose one of the built-in datasets that come with R. 
 
-```{r setSeed, exercise=TRUE}
-set.seed(1)  # Change 1 to any other number until the code has an error. 
-x <- rnorm(100, mean = 3, sd = 1)
-log_x <- log(x)
-for (i in 1:length(x)) {
-  if (log_x[i] < 0) {
-    log_x[i] <- 0
-  }
+- `verbatimTextOutput()` and `tableOutput()` are **output controls** that tell Shiny where to put rendered output (we’ll get into the how in a moment). `verbatimTextOutput()` displays code and `tableOutput()` displays tables. 
+
+
+Go ahead and run the app again. You’ll now see the following figure, a page containing a select box. We only see the input, not the two outputs, because we haven’t yet told Shiny how the input and outputs are related.
+
+
+![](images/ui.png){width=80%}
+
+
+### Adding behaviour
+
+Next, we’ll bring the outputs to life by defining them in the server function. We’ll tell Shiny how to fill in the summary and table outputs in the sample app by providing the “recipes” for those outputs. Replace your empty server function with this:
+
+```{r, eval=F, echo=T}
+
+server <- function(input, output, session) {
+  output$summary <- renderPrint({  # "summary" is the output ID we used for verbatimTextOutput() in ui control
+    dataset <- get(input$dataset, "package:datasets") # retrieve dataset from the list package::datasets
+    summary(dataset)  # Output the summary of the dataset
+  })
+  
+  output$table <- renderTable({ # "table" is the output ID we used for tableOutput() in ui control
+    dataset <- get(input$dataset, "package:datasets")
+    dataset # Output the dataset
+  })
 }
 
-hist(log_x)
 ```
 
-```{r setSeed-solution, error=TRUE}
-# There are many possible solutions, but here is one of them: 
-set.seed(8)
-x <- rnorm(100, mean = 3, sd = 1)
-log_x <- log(x)
-for (i in 1:length(x)) {
-  if (log_x[i] < 0) {
-    log_x[i] <- 0
-  }
+- The left-hand side of the assignment operator (`<-`), `output$ID`, indicates that you’re providing the recipe for the Shiny output with that ID. 
+
+- The right-hand side of the assignment uses a specific render function to wrap some code that you provide. Each `render{Type}` function is designed to produce a particular type of output (e.g. text, tables, and plots), and is often paired with a `{type}Output` function in UI control. For example, in this app, `renderPrint()` is paired with `verbatimTextOutput()` to display a statistical summary with fixed-width (verbatim) text, and `renderTable()` is paired with `tableOutput()` to show the input data in a table.
+
+
+Run the app again and play around, watching what happens to the output when you change an input. The following figure shows what you should see when you open the app.
+
+![](images/server.png){width=80%}
+
+## Reactive Expressions
+
+Even in this simple example, we have some code that’s duplicated: the following line is present in both outputs.
+
+```{r, eval=F, echo=T}
+dataset <- get(input$dataset, "package:datasets")
+```
+
+In traditional R scripting, we use two techniques to deal with duplicated code: either we capture the value using a variable, or capture the computation with a function. Unfortunately neither of these approaches work here, and we need a new mechanism: **reactive expressions**.
+
+You create a reactive expression by wrapping a block of code in `reactive({...})` and assigning it to a variable, and you use a reactive expression by calling it like a function. But while it looks like you’re calling a function, a reactive expression has an important difference: it only runs the first time it is called and then it caches its result until it needs to be updated.
+
+We can update our `server()` to use reactive expressions, as shown below. The app behaves identically, but works a little more efficiently because it only needs to retrieve the dataset once, not twice.
+
+```{r, eval=F, echo=T}
+
+server <- function(input, output, session) {
+  # Create a reactive expression
+  dataset <- reactive({
+    get(input$dataset, "package:datasets")
+  })
+
+  output$summary <- renderPrint({
+    # Use a reactive expression by calling it like a function
+    summary(dataset())
+  })
+  
+  output$table <- renderTable({
+    dataset()
+  })
 }
 
-# One clever way to do this is by setting the seed in a for loop, and when it 
-# results in an error, you'll have the seed number saved that broke the code.
-
-hist(log_x)
 ```
 
-Now that the error is reproducible, it should be easier to debug. 
 
-### Exercise: 
+## Basic UI - Inputs
 
-Using `set.seed(8)`, find the first value of $i$ in the for-loop that causes an error. What's special about this value of $i$? 
+As we saw in the previous chapter, you use functions like `sliderInput()`, `selectInput()`, `textInput()`, and `numericInput()` to insert input controls into your UI specification. Now we’ll discuss the common structure that underlies all input functions and give a quick overview of the inputs built into Shiny.
 
-```{r whichI, exercise=TRUE}
-set.seed(8)  
-x <- rnorm(100, mean = 3, sd = 1)
-log_x <- log(x)
-for (i in 1:length(x)) {
-  if (log_x[i] < 0) {
-    log_x[i] <- 0
-  }
-}
+### Common Structure
+
+All input functions have the same first argument: `inputId`. This is the identifier used to connect the front end with the back end: if your UI has an input with ID "name", the server function will access it with `input$name`.
+
+The inputId has two constraints:
+
+- It must be a simple string that contains only letters, numbers, and underscores (no spaces, dashes, periods, or other special characters allowed!). Name it like you would name a variable in R.
+
+- It must be unique. If it’s not unique, you’ll have no way to refer to this control in your server function!
+
+Most input functions have a second parameter called `label`. This is used to create a human-readable label for the control. The third parameter is typically `value`, which, where possible, lets you set the default value.
+
+### Free text
+
+Collect small amounts of text with `textInput()`, passwords with `passwordInput()`, and paragraphs of text with `textAreaInput()`.
+
+```{r, eval=F, echo=T}
+
+ui <- fluidPage(
+  textInput("name", "What's your name?"),
+  passwordInput("password", "What's your password?"),
+  textAreaInput("story", "Tell me about yourself", rows = 3)
+)
+
 ```
 
-```{r whichI-solution}
-# Because the code throws an error, the for loop stops. Thus, the value of i 
-# that causes the error is available after the for-loop finishes. 
-# 
-# Another solution could be to print each value of i in the for-loop. 
-set.seed(8)  
-x <- rnorm(100, mean = 3, sd = 1)
-log_x <- log(x)
-for (i in 1:length(x)) {
-  if (log_x[i] < 0) {
-    log_x[i] <- 0
-  }
-}
+![](images/free-text.png){width=80%}
 
-cat("x[i] = ", x[i])  
-# x[i] is negative, so taking the log results in NaN, which causes an error in 
-# the if statement, because we can't compare missing values to a number. 
+### Numeric Inputs
+
+To collect numeric values, create a constrained text box with `numericInput()` or a slider with `sliderInput()`. If you supply a length-2 numeric vector for the default value of `sliderInput()`, you get a “range” slider with two ends.
+
+```{r, eval=F, echo=T}
+
+ui <- fluidPage(
+  numericInput("num", "Number one", value = 0, min = 0, max = 100),
+  sliderInput("num2", "Number two", value = 50, min = 0, max = 100),
+  sliderInput("rng", "Range", value = c(10, 20), min = 0, max = 100)
+)
+
 ```
 
-### Optional Exercise
+![](images/numeric.png){width=80%}
+Sliders are extremely customisable and there are many ways to tweak their appearance. See `?sliderInput` and [here](https://shiny.rstudio.com/articles/sliders.html).
 
-Save this exercise for the end, if there is time. 
+### Dates
 
-Open the file `lab12/plotMin_bug.R`, and use any debugging tool to identify potetential bug(s) in the file and fix them. 
-This script will plot a function and it's minimum value.
+Collect a single day with `dateInput()` or a range of two days with `dateRangeInput()`. These provide a convenient calendar picker, and additional arguments like `datesdisabled` and `daysofweekdisabled` allow you to restrict the set of valid inputs.
 
-## Performance Evaluation in `R`
+```{r, eval=F, echo=T}
+ui <- fluidPage(
+  dateInput("dob", "When were you born?"),
+  dateRangeInput("holiday", "When do you want to go on vacation next?")
+)
+```
 
-`R` is a really good programming language for Statistics and Data Science, but it does have some flaws. In the introduction to [Advanced R](https://adv-r.hadley.nz/introduction.html), Hadley Wickham (a big advocate of the `R` programming language) notes some potential issues with `R`, including the following: 
+![](images/date.png){width=80%}
 
-> Much of the `R` code you’ll see in the wild is written in haste to solve a pressing problem. As a result, code is not very elegant, fast, or easy to understand.
-> `R` is not a particularly fast programming language, and poorly written `R` code can be terribly slow. `R` is also a profligate user of memory.
+### Limited Choices
 
-Performance evaluation tools can help us improve our `R` code and avoid these issues. 
-Specifically, in lecture we discussed *profiling* and *(micro)benchmarking* as useful tools to help evaluate the performance of our code. 
+There are two different approaches to allow the user to choose from a prespecified set of options: `selectInput()` and `radioButtons()`.
 
-**Exercise:** 
+```{r, eval=F, echo=T}
 
-```{r profileVSbench}
-question(
-  "What is the difference between profiling and benchmarking?",
-  answer("There is no significant difference, both functions do the same thing."),
-  answer("Profiling is used to get an accurate estimate of how long a function will take, whereas benchmarking is used to determine how long each step of a function (or program) takes."),
-  answer("Profiling is used to determine how long each step of a function (or program) takes, whereas benchmarking is used to get an accurate estimate of how long a function will take.", correct = TRUE),
-  answer("Profiling compares the speed of a function to other functions, and benchmarking does not.")
+animals <- c("dog", "cat", "mouse", "bird", "other", "I hate animals")
+
+ui <- fluidPage(
+  selectInput("state", "What's your favourite state?", state.name),
+  radioButtons("animal", "What's your favourite animal?", animals)
+)
+```
+
+![](images/limited-choices.png){width=80%}
+
+Dropdowns created with `selectInput()` take up the same amount of space, regardless of the number of options, making them more suitable for longer options. You can also set `multiple = TRUE` to allow the user to select multiple elements.
+
+```{r, eval=F, echo=T}
+ui <- fluidPage(
+  selectInput(
+    "state", "What's your favourite state?", state.name,
+    multiple = TRUE
+  )
+)
+```
+
+![](images/multi-select.png){width=80%}
+
+There’s no way to select multiple values with radio buttons, but there’s an alternative that’s conceptually similar: `checkboxGroupInput()`.
+
+```{r, eval=F, echo=T}
+ui <- fluidPage(
+  checkboxGroupInput("animal", "What animals do you like?", animals)
+)
+```
+
+![](images/multi-radio.png){width=80%}
+
+### File Uploads
+
+Allow the user to upload a file with `fileInput()`:
+
+```{r, eval=F, echo=T}
+
+ui <- fluidPage(
+  fileInput("upload", NULL)
+)
+
+```
+
+![](images/upload.png){width=80%}
+
+
+**Exercises:**
+
+Carefully read the documentation for `sliderInput()` to figure out how to create a date slider, as shown below.
+
+![](images/date-slider.png){width=80%}
+
+```{r dateslider, exercise=TRUE}
+sliderInput(...)
+```
+
+```{r dateslider-hint-1}
+?sliderInput 
+# Check how to set the range and default value for the slider.
+```
+
+```{r dateslider-solution}
+sliderInput(
+  "dates",
+  "When should we deliver?",
+  min = as.Date("2019-08-09"),
+  max = as.Date("2019-08-16"),
+  value = as.Date("2019-08-10")
 )
 ```
 
 
-### **Exercise: calculating the mean of a vector** 
+## Basic UI - Output
 
-Use the function `bench::mark` to determine which is the fastest way to compute the mean of a vector. 
+`output` is very similar to `input`: it’s also a list-like object named according to the output ID. The main difference is that you use it for sending output instead of receiving input. You always use the `output` object in concert with a `render` function, as in the following simple example:
 
-```{r timeMean, exercise = TRUE}
-set.seed(234532)
-x <- rnorm(n = 100000, mean = 1.5, sd = 2)
+```{r, eval=F, echo=T}
+ui <- fluidPage(
+  textOutput("greeting")
+)
 
-mean1 <- function(x) {
-  mean(x)
+server <- function(input, output, session) {
+  output$greeting <- renderText("Hello human!")
 }
+```
 
-mean2 <- function(x) {
-  sum(x) / length(x)
+The render function does two things:
+
+- It sets up a special reactive context that automatically tracks what inputs the output uses.
+
+- It converts the output of your R code into HTML suitable for display on a web page.
+
+- You’ll get an error if you forget the render function:
+
+```{r, eval=F, echo=T}
+
+server <- function(input, output, session) {
+  output$greeting <- "Hello human"
 }
+shinyApp(ui, server)
+#> Error: Unexpected character object for output$greeting
+#> Did you forget to use a render function?
+```
 
-mean3 <- function(x) {
-  tmp <- 0
-  for (i in 1:length(x)) {
-    tmp <- tmp + x[i]
-  }
-  tmp / length(x)
+
+## Reactive Programming
+
+An app is going to be pretty boring if it only has inputs or only has outputs. The real magic of Shiny happens when you have an app with both. Let’s look at a simple example:
+
+```{r, eval=F, echo=T}
+ui <- fluidPage(
+  textInput("name", "What's your name?"),
+  textOutput("greeting")
+)
+
+server <- function(input, output, session) {
+  output$greeting <- renderText({
+    paste0("Hello ", input$name, "!")
+  })
 }
 
 ```
 
+ If you run the app, and type in the name box, you’ll see that the greeting updates automatically as you type:
+ 
+![](images/connection-3.png){width=50%}
+ 
+ This is the big idea in Shiny: you don’t need to tell an output when to update, because Shiny automatically figures it out for you. 
+ 
+ 
+## Case Study - Simulations
+ 
+Imagine I want to compare two simulated datasets with a plot and a hypothesis test. I’ve done a little experimentation and come up with the functions below: `freqpoly()` visualises the two distributions with frequency polygons, and `t_test()` uses a t-test to compare means and summarises the results with a string:
 
-```{r timeMean-solution}
-set.seed(234532)
-x <- rnorm(n = 100000, mean = 1.5, sd = 2)
 
-mean1 <- function(x) {
-  mean(x)
+```{r}
+freqpoly <- function(x1, x2, binwidth = 0.1, xlim = c(-3, 3)) {
+  df <- data.frame(
+    x = c(x1, x2),
+    g = c(rep("x1", length(x1)), rep("x2", length(x2)))
+  )
+
+  ggplot(df, aes(x, colour = g)) +
+    geom_freqpoly(binwidth = binwidth, size = 1) +
+    coord_cartesian(xlim = xlim)
 }
 
-mean2 <- function(x) {
-  sum(x) / length(x)
-}
 
-mean3 <- function(x) {
-  tmp <- 0
-  for (i in 1:length(x)) {
-    tmp <- tmp + x[i]
-  }
-  tmp / length(x)
-}
-
-mark(mean1(x), mean2(x), mean3(x))
-```
-
-### Exercise: speeding up a for loop. 
-
-One common approach to speeding up `R` code is by replacing for-loops with vectorized operations. See if you can write a vectorized version of the function below that is faster than the for loop, and demonstrate that you get the same result but faster using `bench::mark`. 
-
-```{r slowFor, exercise = TRUE}
-set.seed(623)
-x <- rbeta(5000, 0.5, 1.4)
-
-f1 <- function(x) {
-  n <- length(x)
-  num_gt_05 <- 0
+t_test <- function(x1, x2) {
+  test <- t.test(x1, x2)
   
-  for (i in 1:n) {
-    if (x[i] > 0.5) {
-      num_gt_05 <- num_gt_05 + 1
-    }
-  }
-  num_gt_05 / n
+  # use sprintf() to format t.test() results compactly
+  sprintf(
+    "p value: %0.3f\n[%0.2f, %0.2f]",
+    test$p.value, test$conf.int[1], test$conf.int[2]
+  )
 }
 
-f2 <- function(x) {
-  # TODO: Edit this function
-}
 ```
 
-```{r slowFor-hint-1}
-# By default, the function bench::mark checks if the two functions give the same results. 
-```
-
-```{r slowFor-hint-2}
-# What does sum(c(TRUE, TRUE, FALSE, FALSE, TRUE)) return? How might we take 
-# advantage of this? 
-```
-
-```{r slowFor-solution}
-set.seed(623)
-x <- rbeta(5000, 0.5, 1.4)
-
-f1 <- function(x) {
-  n <- length(x)
-  num_gt_05 <- 0
-  
-  for (i in 1:n) {
-    if (x[i] > 0.5) {
-      num_gt_05 <- num_gt_05 + 1
-    }
-  }
-  num_gt_05 / n
-}
-
-f2 <- function(x) {
-  # One possible solution: 
-  sum(x > 0.5) / length(x)
-}
-
-bench::mark(f1(x), f2(x))
-```
-
-
-## Parallelization 
-
-One way to speed up your code is by parallization. 
-Most modern computers have processors with multiple *cores*. Each *core* is basically a "brain" of the computer, as it receives instructions and then performs the desired calculations that satisfy those instructions. 
-When we normally run `R`, we are only running our commands on a single core. 
-Some operations, however, can be computed in parallel, meaning that one operation can be performed independently of another operation. 
-When this is the case, we can *parallelize* our code so that it runs on more cores than one; if done correctly, this speeds up the computation time of our code. 
-For example, if we run a porperly parallized command on 4 cores instead of 1, this should run approximately 4 times faster! 
-
-There are many tools to do parallization in `R`, but here we focus on only a few: 
-
-- `parallel` package: `parLapply`
-- `foreach` and `doParallel`
-
-### `parallel` package
-
-For more resources, see [this Umich Website](https://dept.stat.lsa.umich.edu/~jerrick/courses/stat701/notes/parallel.html).
-As mentioned in the linked website, parallelization in `R` is easiest if you're using a Macbook or Linux computer. In section, we'll just demonstrate the parallelization techniques that work for all systems (including Windows). 
-
-First, we can check how many cores our computer has with the command: 
+If I have some simulated data, I can use these functions to compare two variables:
 
 ```{r}
-numCores <- detectCores()
-numCores
+set.seed(1)
+x1 <- rnorm(100, mean = 0, sd = 0.5)
+x2 <- rnorm(200, mean = 0.15, sd = 0.9)
+
+freqpoly(x1, x2)
+cat(t_test(x1, x2))
+#> p value: 0.005
+#> [-0.39, -0.07]
+
 ```
 
-Now, we create a *Socket Cluster*. When we make a Socket Cluster, we are starting new `R` processes on our computer, so this means that packages and variables that were created outside of the cluster will not be available to us. 
+I’d like to use these two tools to quickly explore a bunch of simulations. A Shiny app is a great way to do this because it lets you avoid tediously modifying and re-running R code. Below I wrap the pieces into a Shiny app where I can interactively tweak the inputs. Let's look at how to create the following Shiny app.
 
-```{r}
-cl <- makeCluster(numCores)
+![](images/case-study-1.png){width=90%}
+
+Let’s start with the **UI**. The first row has three columns for input controls (distribution 1, distribution 2, and plot controls). The second row has a wide column for the plot, and a narrow column for the hypothesis test.
+
+```{r, eval=F, echo=T}
+ui <- fluidPage(
+  fluidRow(
+    column(4, # 4 is the width of the column
+      "Distribution 1",
+      numericInput("n1", label = "n", value = 1000, min = 1),
+      numericInput("mean1", label = "µ", value = 0, step = 0.1),
+      numericInput("sd1", label = "σ", value = 0.5, min = 0.1, step = 0.1)
+    ),
+    column(4, 
+      "Distribution 2",
+      numericInput("n2", label = "n", value = 1000, min = 1),
+      numericInput("mean2", label = "µ", value = 0, step = 0.1),
+      numericInput("sd2", label = "σ", value = 0.5, min = 0.1, step = 0.1)
+    ),
+    column(4,
+      "Frequency polygon",
+      numericInput("binwidth", label = "Bin width", value = 0.1, step = 0.1),
+      sliderInput("range", label = "range", value = c(-3, 3), min = -5, max = 5)
+    )
+  ),
+  fluidRow(
+    column(9, plotOutput("hist")),
+    column(3, verbatimTextOutput("ttest"))
+  )
+)
+
 ```
 
-Now let's take the mean of each column of the `iris` dataset using all of our computer cores: 
+- `fluidRow()` creates a row in the Shiny panel.
 
-```{r}
-parSapply(cl, iris, mean, na.rm = TRUE)
-```
+- `column()` clarifies what inputs are included in one column within a row.
 
-Note that the code above is simply running an `sapply` in a parallelized fashion: each column of the dataset is an input for the function `mean`, and each calculation is being calculated on a different computer core at the same time! 
+- We use two types of outputs: `plotOutput()` and `verbatimTextOutput()`, to inlcude plot and text, respectively.
 
-When we are done, we need to close the cluster so that we aren't wasting our computer's resources: 
 
-```{r}
-stopCluster(cl)
-```
+The server function combines calls to freqpoly() and t_test() functions after drawing from the specified distributions:
 
-## `foreach` and `doParallel` package
+```{r, eval=F, echo=T}
 
-Another great tool is the `foreach` and `doParallel` packages. These allow us to write for-loops that are computed in parallel: 
+server <- function(input, output, session) {
+  output$hist <- renderPlot({
+    x1 <- rnorm(input$n1, input$mean1, input$sd1)
+    x2 <- rnorm(input$n2, input$mean2, input$sd2)
+    freqpoly(x1, x2, binwidth = input$binwidth, xlim = input$range)
+  }, res = 96)
 
-```{r}
-registerDoParallel(numCores)  # setting up system for parallelization
-
-normal_sqrt <- function(n) {
-  res <- c() 
-  for (i in 1:n) {
-    res <- c(res, sqrt(i))
-  }
-  res
+  output$ttest <- renderText({
+    x1 <- rnorm(input$n1, input$mean1, input$sd1)
+    x2 <- rnorm(input$n2, input$mean2, input$sd2)
+    
+    t_test(x1, x2)
+  })
 }
 
-par_sqrt <- function(n) {
-  foreach(i=1:n, .combine = c) %dopar% {
-    sqrt(i)
-  }
-}
-
-normal_sqrt(10)
-par_sqrt(10)
 ```
 
-If you were to time the two functions above, you'd likely see that the parallel version is actually slower. This is because there is some overhead when using `%dopar%` with `foreach`, and each operation is relatively quick. 
-This fact highlights when parallelization is most effective: each iteration in a calculation is computationally intensive when compared to the parallelization overhead. 
+You can run this example in `app-simulations.R`.
+
+
+**Exercise**
+We want to run simulations for two Poisson distributions. The inputs should be the parameters `lambda1` and `lambda2` for the two distributions, and the number of samples `n`. The output should be frequency polygons for the two samples (You can use the function `freqpoly()` defined before). Generate the app as shown in the following figure. 
+
+![](images/simulation-2.png){width=90%}
+
+
