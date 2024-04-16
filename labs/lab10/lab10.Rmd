@@ -7,428 +7,235 @@ output:
 runtime: shiny_prerendered
 ---
 
+
 ## Set up
 
 ```{r installPackages, echo=FALSE, include=FALSE, message=FALSE}
 # This just checks if students need to install some packages that they might 
 # not have.
-# For HW4 Q2, Q3
-if (!require(Lahman)) 
-  install.packages("Lahman", repos = "http://cran.us.r-project.org")
+
+if (!packageVersion("learnr") == "0.11.1") 
+  install.packages("learnr", repos = "http://cran.us.r-project.org")
+
 ```
 
-```{r setup, eval=TRUE, include=FALSE, message=FALSE, echo=FALSE}
-library(Lahman) # For HW4 Q2, Q3
+```{r setup, eval=TRUE, include=TRUE, message=FALSE, echo=TRUE}
 library(learnr)     # For interactive exercises
-library(lubridate)
-library(tidyverse)  # For dplyr, stringr
-
-
-tutorial_options(exercise.reveal_solution=TRUE)
+#library(tidyverse)  # For dplyr, purrr
+library(purrr)
+library(dplyr)
 ```
 
+```{r, include=FALSE, message=FALSE, echo=FALSE}
+tutorial_options(exercise.reveal_solution=FALSE)
+```
 
 ## Today's Content
 
-- Strings and Regular Expressions
+- More on Iterations
 
 
-## Strings
+## Review
 
-Recall that a **string** is a sequence of characters.
+- Loops
+  - `for` loops
+  Syntax:
+  ```
+    for (index in vector) {
+       [do something for each index]
+    }
+  ```
+  - `while` loops
+  Syntax:
+  ```
+   <OPTIONALLY INITIALIZING THE ITERATOR>
+   while (<condition is true>) {
+      [do something]
 
-Below is an example of a string as it would appear on paper.
-```
-backyard
-```
-
-Strings in R work differently than they do on paper. In R, a string **must either begin and end with a double quote `"` or begin and end with a single quote `'`.**
-```{r}
-"backyard"
-'backyard'
-```
-
-**Question:** What would happen if you entered `"backyard"` without the quotes and why?
-```{r no_quotes, exercise=TRUE}
-
-```
-
-```{r no_quotes-solution}
-backyard
-# Without the quotes, the interpreter would assume that backyard is an
-# object that we want to print. It wouldn't be able to find backyard because
-# it doesn't exist and would then throw an error.
-```
-
-`writeLines()` takes the R version of a string and shows us the paper version.
-```{r, comment=NA}
-writeLines("backyard")
-```
-
-Certain characters are inserted in strings using **escape sequences**. An escape sequence starts with a backslash `\`. For example, the escape sequence for `tab` is `\t`. The backslash combines with the next character to form an escape sequence. See the help page on `Quotes` for the list of valid escape sequences in R. This is how a tab would be inserted in the previous string.
-```{r}
-"back\tyard"
-```
-
-This may be more natural, but it's worse because it's ambiguous.
-```{r}
-"back    yard"
-```
-
-To include a backslash, use the escape sequence `\\`.
-```{r}
-"back\\yard"
-```
-
-Another commonly used escape sequence is the newline escape sequence. A newline represents the start of a new line.
-```{r}
-"back\nyard"
-```
-
-**Question:** What would happen if you tried to insert a tab, or a backslash, or a newline in the middle of `"backyard"` without using an escape sequence and why? 
-```{r escape_seqs, exercise=TRUE}
-
-```
-
-```{r escape_seqs-solution}
-# Inserting a tab by hitting the tab key doesn't work. In the console, it would
-# bring up the autocomplete box.
-# Inserting a backslash with just one backslash causes \y to be interpreted as
-# an escape sequence, which causes an error as \y isn't a valid escape
-# sequence.
-# Inserting a newline by hitting the return key seems to work, but R seems to
-# think that the code has a mistake
-```
-
-Here are the outputs of `writeLines()` for the three modifications of `"backyard"`. They look the way they would on paper.
-```{r, comment=NA}
-writeLines("back\tyard")
-writeLines("back\\yard")
-writeLines("back\nyard")
-```
-
-Since quotes are used to mark the start and end of an R string, an escape sequence must be used to put a quote in the middle of an R string if it's of the same type as the start and end quotes.
-```{r, comment=NA}
-"back\"yard" 
-writeLines("back\"yard")
-```
-
-**Question:** What happens if you don't escape and why?
-```{r no_escaping, exercise=TRUE}
-
-```
-
-```{r no_escaping-solution}
-# The interpreter sees the middle quote and thinks that the string has ended,
-# but then sees another character, which doesn't make any sense, so it throws
-# an error
-"back"yard"
-```
-
-However, if the quote is of the other type, escaping isn't necessary.
-```{r, comment=NA}
-"back'yard"
-writeLines("back'yard")
-```
-
-## Strings: More Functions
-
-We've talked about several functions for working with strings: `str_c()`, `str_length()`, `str_sub()`, `str_split()`, etc. Some additional useful string functions are described below.
-
-`strrep()` is used to repeat a string. `strrep()` is in the `base` package unlike the other string functions we've covered.
-```{r}
-strrep(c("apple", "banana", "cherry"), 1:3)
-```
-
-`str_interp()` makes a string from a template by inserting the values of variables. This can be very useful when making titles for plots. Note that a variable must be enclosed in braces and a dollar sign must be put before the left brace.
-```{r}
-x <- 1
-y <- 2
-z <- 3
-str_interp("${x} + ${y} = ${z}")
-```
-
-### Exercise
-
-Without hard-coding, recreate the ASCII art below. There are 10 lines, each of which has 8 hyphens in the middle.
-```
-|----------|
-|----------|
-|----------|
-|----------|
-|----------|
-|----------|
-|----------|
-|----------|
-|----------|
-|----------|
-```
-
-```{r strrep, exercise=TRUE}
-
-```
-
-```{r strrep-hint}
-# Try using strrep() and writeLines() in a for loop
-```
-
-```{r strrep-solution}
-for (n in 1:10) {
-  line <- str_c("|", strrep("-", 10), "|")
-  writeLines(line)
-}
-```
-
-### Exercise
-
-Recall that `iris` is a data frame with measurements of petal and sepal length and width for a few flower species. `make_scatterplot()` takes a species and two measurement variables and makes a scatterplot of the variables for that species. Complete `make_scatterplot()`. If the species is `virginica`, the `x` variable is `Sepal.Length`, and the `y` variable is `Sepal.Width`, then the title of the plot should be `"Sepal.Width vs. Sepal.Length for virginica"`
-```{r str_interp, exercise=TRUE}
-make_scatterplot <- function(species, x_var, y_var) {
-  title <- # Fill in
-  iris %>%
-    # Fill in - only use data for species
-    ggplot(aes(!!as.name(x_var), !!as.name(y_var))) +
-    # Fill in - choose the right geom
-    # Fill in - set the title
-    theme_bw()
-}
-make_scatterplot("virginica", "Sepal.Length", "Sepal.Width")
-```
-
-```{r str_interp-solution}
-make_plot <- function(species, x_var, y_var) {
-  title <- str_interp("${y_var} vs. ${x_var} for ${species}")
-  iris %>%
-    filter(Species == species) %>%
-    ggplot(aes(!!as.name(x_var), !!as.name(y_var))) +
-    geom_point() +
-    ggtitle(title) +
-    theme_bw()
-}
-make_plot("virginica", "Sepal.Length", "Sepal.Width")
-```
-
-### Optional Challenge Exercise
-
-Without hard-coding, recreate the ASCII art below. There are 8 lines, each of which has 7 hyphens in the middle.
-```
-|\-------|
-|-\------|
-|--\-----|
-|---\----|
-|----\---|
-|-----\--|
-|------\-|
-|-------\|
-```
-
-```{r challenge, exercise=TRUE}
-
-```
-
-```{r challenge-solution}
-for (n in 0:7) {
-  line <- str_c("|", strrep("-", n), "\\", strrep("-", 7 - n), "|") 
-  writeLines(line)
-}
-```
-
-
-## Regular Expressions
-
-A **regular expression** is a string specifying a pattern that other strings may or may not match. Regular expressions can be used to
-
-  - find strings matching a pattern
-  - modify substrings matching a pattern
-  - delete substrings matching a pattern
+      <OPTIONALLY INCREMENTING THE ITERATOR>
+   }
+  ```
+- The Map Family
+  - Maps: The `map` functions are **functionals** (_a function that takes a function 
+  as an input and returns a vector as output_). They take **lists** or **atomic vectors** 
+  and a **function** as arguments.
+  - Variants of Map:
+    - `map_int()` creates an integer vector.
+    - `map_dbl()` creates a double vector.
+    - `map_chr()` creates a character vector.
+    - `map_lgl()` creates a logical vector.
+    - `map_df()` creates a dataframe.
+  - Map with multiple inputs
+    - `map2()` for two inputs
+    - `pmap()` parallel map, for multiple inputs
+    
+## Mapping over multiple arguments
+So far we’ve mapped along a single input. But often you have multiple related inputs that you need iterate along in parallel. That’s the job of the` map2()` and `pmap()` functions. For example, imagine you want to simulate some random normals with different means. You know how to do that with `map2()`:
   
-An example use of regular expressions is validation of email addresses. If a company wants to check whether a customer's email address is valid, they could check whether it matches a regular expression like [this one](https://stackoverflow.com/a/201378):
-
-```
-(?:[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*|"(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21\x23-\x5b\x5d-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])*")@(?:(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?|\[(?:(?:(2(5[0-5]|[0-4][0-9])|1[0-9][0-9]|[1-9]?[0-9]))\.){3}(?:(2(5[0-5]|[0-4][0-9])|1[0-9][0-9]|[1-9]?[0-9])|[a-z0-9-]*[a-z0-9]:(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21-\x5a\x53-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])+)\])
-```
-
-### Metacharacters
-
-Several characters have special meanings inside regular expressions. They are called **metacharacters**. These are the metacharacters:
-
-`. \ | ( ) [ ] ^ $ { } * + ?`
-
-For example, `.` matches any character.
-
-If you do not want a metacharacter to have its special meaning, you need to prepend it with **two** backslashes.
 ```{r}
-str_view_all(c("$2.50", "2 dollars"), "\\.")
+set.seed(306)
+mu <- list(5, 10, -3)
+sigma <- list(1, 5, 10)
+map2(mu, sigma, rnorm, n = 5) %>% str()
 ```
-
-**Question:** What happens if you use only one backslash or no backslashes and why?
-```{r too_few_backslashes, exercise=TRUE}
-
-```
-
-```{r too_few_backslashes-solution}
-# Both strings match since . matches any character
-str_view_all(c("$2.50", "2 dollars"), ".")
-# Causes an error since \. isn't a valid escape sequence
-str_view_all(c("$2.50", "2 dollars"), "\.")
-```
-
-An alternative is to use `fixed()`.
+Or we can use the shortcut
 ```{r}
-str_view_all(c("$2.50", "2 dollars"), fixed("."))
+map2(mu, sigma, ~rnorm(5, .x, .y)) %>% str()
+
 ```
+`map2()` generates this series of functions calls:
+![](images/map2.png){width=90%}
 
-### Character Classes
-
-- `.` matches any character
-- `[abcd]` matches any one of the characters between the brackets
-- `[^abcd]` matches any character *not* between the brackets (excluding `^`)
-- `[a-d]` matches any character in the specified range; it's the same as `[abcd]`
-
-An example:
+For more arguments, we can use `pmap()`
 ```{r}
-str_view_all(c("$2.50", "2 dollars"), "[a-zA-Z]")
+n <- list(1, 3, 5)
+mu <- list(5, 10, -3)
+sigma <- list(1, 5, 10)
+args1 <- list(n, mu, sigma)
+args1 %>%
+  pmap(rnorm) %>% 
+  str()
 ```
+`pmap()` generates this series of functions calls:
+![](images/pmap.png){width=90%}
 
-An alternative way to make the matching case-insensitive:
+## Invoking different functions
+There’s one more step up in complexity - as well as varying the arguments to the 
+function you might also vary the function itself:
 ```{r}
-str_view_all(c("$2.50", "2 dollars"), regex("[a-z]", ignore_case = TRUE))
+f <- c("runif", "rnorm", "rpois")
+param <- list(
+  list(min = -1, max = 1), 
+  list(sd = 5), 
+  list(lambda = 10)
+)
 ```
-
-
-### Shorthand
-
-- `\w` matches a "word" character, equivalent to `[0-9A-Za-z_]`, i.e., digits, letters, and the underscore
-- `\s` matches any whitespace character, including tabs and newlines
-- `\d` matches digits, equivalent to `[0-9]`
-- `\W`, `\S`, and `\D` match the opposite of the lower-case versions
-
-In the example below, we check which string contains whitespace. Note that **two** backslashes need to be used. Why?
+To handle this case, we can use `invoke_map()`
 ```{r}
-str_view_all(c("$2.50", "2 dollars"), "\\s")
+invoke_map(f, param, n = 5) %>% str()
 ```
+`invoke_map()` generates this series of functions calls:
+![](images/invoke_map.png){width=90%}
 
-### Grouping
-
-- `()` are used to group patterns together. This can be used to extract matches individually.
-- `\1` refers to the match to the first group, `\2` refers to the match to the second group, etc.
-
-In this example, we check which string contains a repeated letter.
+However, we see the warning that `invoke_map()` was decprecated in purrr 1.0.0.
+Instead, we can use `pmap() + exec()` as the following:
 ```{r}
-str_view_all(c("$2.50", "2 dollars"), "([a-z])\\1")
+pmap(list(f, param), ~ exec(..1, !!!(..2), n = 5)) %>% str()
+
 ```
+where `..2` refers to the second argument passed to the anonymous function, which corresponds to the parameter lists. `!!!(..2)` unquotes and splices the elements of the parameter list as individual arguments for the `exec()` call.
 
-### Operators
 
-- `|` is the OR operator and allows matches of either side
-- `{}` describes how many times the preceeding character or group must occur:
-  - `{m}` must occur exactly `m` times
-  - `{m,n}` must occur between `m` and `n` times, inclusive
-  - `{m,}` Must occur at least `m` times
-- `*` means the preceeding character can appear zero or more times, equivalent to `{0,}`
-- `+` means the preceeding character must appear one or more times, equivalent to `{1,}`
-- `?` means the preceeding character can appear zero or one time, equivalent to `{0,1}`
+## The Apply Family
+The apply family of functions in base R (`apply()`, `lapply()`, `mapply()`, etc) are
+used as alternatives to loops.
 
-Which string has two digits in a row?
+## apply()
+`apply()` is used to apply functions over array margins. The usage of `apply` is
+```
+apply(X, MARGIN, FUN, ..., simplify = TRUE)
+```
+where `X` is an array or matrix, `MARGIN` is a vector that giving the substcripts which the function will be over. `MARGIN` is a variable defining how the function is applied: when `MARGIN=2`, it applies over columns. In higher dimensional data, `MARGIN` select the axes/dimensions and how the functions applies to. `FUN` is the function to be applied.
+Here is an example in 2D matrix: construct a $5 \tinmes 6$ matrix and sum the values of each column.
 ```{r}
-str_view_all(c("$2.50", "2 dollars"), "[0-9]{2}")
+mat<- matrix(1:30, nrow = 5, ncol = 6)
+col_sums <- apply(mat, 2, sum)
+print(col_sums)
 ```
 
-### Anchors
+### Excercise 1
+Sum the values of each rows of the matrix usibng `apply`. What happend when we set the `MARGIN=c(1,2)`
+```{r Ex1, exercise=TRUE}
+mat<- matrix(1:30, nrow = 5, ncol = 6)
+```
+```{r Ex1-solution}
+mat<- matrix(1:30, nrow = 5, ncol = 6)
+row_sums <- apply(mat, 2, sum)
+print(row_sums)
 
-- `^` matches the start of a string (or line)
-- `$` matches the end of a string (or line)
-- `\b` matches a word boundary
-- `\B` matches not word boundary
+row_sums <- apply(mat, c(1,2), sum)
+print(row_sums)
+# It applies both rows and columns, so the sum is applying on each element of the matrix.
+```
 
-Which string starts with a dollar sign? Note that `$` is escaped with **two** backslashes.
+### Apply over 3D array
+Use `apply()` to sum along the 3rd axis of a 3D array 
 ```{r}
-str_view_all(c("$2.50", "2 dollars"), "^\\$")
+array_3d <- array(runif(3*4*5), dim = c(3, 4, 5))
+print(array_3d)
 ```
-
-
-## Regular Expression Exercises
-
-The exercises below use this paragraph.
-
 ```{r}
-baseball <- "According to Baseball Reference’s wins above average, The Red Sox had the best 
-outfield in baseball— one-tenth of a win ahead of the Milwaukee Brewers, 11.5 to 11.4. And 
-that’s despite, I’d argue, the two best position players in the NL this year (Christian 
-Yelich and Lorenzo Cain) being Brewers outfielders. More importantly, the distance from 
-Boston and Milwaukee to the third-place Yankees is about five wins. Two-thirds of the Los 
-Angeles Angels’ outfield is Mike Trout (the best player in baseball) and Justin Upton (a 
-four-time All-Star who hit 30 home runs and posted a 122 OPS+ and .348 wOba this year), 
-and in order to get to 11.5 WAA, the Angels’ outfield would have had to replace right 
-fielder Kole Calhoun with one of the three best outfielders in baseball this year by WAA."
+apply(array_3d, MARGIN=c(1, 2), sum)
 ```
 
-The exercises require you to extract matches using `str_extract_all()`
-
-### Exercise 1
-
-Extract all the capitalized words in the paragraph.
-
-```{r baseball1, exercise=TRUE}
-
+## lapply()
+`lapply()` is basically identical to `map()`, except that `map()` is consistent with all the other functions in `purrr`, and you can use the shortcuts for `.f`. It is used to apply a function over a list or vector. The usage of `lapply` is
 ```
-
-```{r baseball1-hint}
-# Try using \b
+lapply(X, FUN, ...)
 ```
-
-```{r baseball1-solution}
-# `\b` looks for a word boundary (not just the beginning of the text snippet!)
-# `[A-Z]` matches a single capitalized letter
-# `[a-z]` matches a single lowercase letter
-# `+` means we match arbitrarily many lowercase letters
-str_extract_all(baseball, "\\b[A-Z][a-z]+")
+where `X` is a vector (atomic or list) or an expression object and `FUN` is the function to be applied to each element of `X`. Here is an example:
+```{r}
+x <- list(list(1, 2, 3), list(4, 5, 6), list(7, 8, 9))
+lapply(x, function(lst) lst[[2]]) %>% str() # select the second element for each sub-list
 ```
+Using function shortcut
+```{r}
+lapply(x, purrr::as_mapper( ~. [[2]])) %>% str()
+```
+Or
+```{r}
+lapply(x, `[[`, 2) %>% str()
+```
+Shortcut is similar to `lambda` function in Python, but it can only work in functions in `purrr` packages directly.
+
 
 ### Exercise 2
+Sample **5** observations from normal distributions with different $\mu$. 
+```{r Ex2, exercise=TRUE}
+mu <- list(5, 10, -3)
+```
 
-Extract all the numbers.
+```{r Ex2-solution}
+mu <- list(5, 10, -3)
+lapply(mu, rnorm, n=5) %>% str() 
+```
 
-```{r baseball2, exercise=TRUE}
+### sapply()
+`sapply()` is a wrapper around `lapply()` that automatically simplifies the output. The result be simplified to a vector, matrix or higher dimensional array if possible. The usage is:
+```
+sapply(X, FUN, ..., simplify = TRUE, USE.NAMES = TRUE)
+```
+Here is an example:
+```{r}
+sapply(x, `[[`, 2)
+```
+
+
+## mapply()
+`mapply()` is basically identical to `pmap()` that it is used to apply a function to multiple list or vectors. The usage of `mapply` is
+```
+mapply(FUN, ..., MoreArgs = NULL, SIMPLIFY = TRUE,
+       USE.NAMES = TRUE)
+```
+where `FUN` is the function to apply, `...` are the arguments to vectorize over, and `MoreArgs` is a list of other arguments to `FUN`. Here is an example using `rep` function to generate a 2D list.
+
+```{r}
+mapply(rep, times = 1:4, x = 4:1)
+```
+There are several arguements in `rep`  with usage `rep(x, ...)`, where `x` is a vector for replicating, and `times` is an integer-valued vector giving the (non-negative) number of times to repeat each elemen.
+```{r}
+mapply(rep, 1:4, 4:1)
+```
+
+### Excersie 3
+Construct a $6 \times 5$ matrix that each row is `[1, 2, 3, 4, 5]` using `mapply` and `rep`.
+```{r Ex3, exercise=TRUE}
 
 ```
 
-```{r baseball2-solution}
-str_extract_all(baseball, "\\.?\\d+\\.?\\d*")
+```{r Ex3-solution}
+mapply(rep, 1:5, 6)
 ```
 
-### Exercise 3
 
-Extract all the hyphenated words.
 
-```{r baseball3, exercise=TRUE}
-
-```
-
-```{r baseball3-solution}
-str_extract_all(baseball, regex("[a-z]+-[a-z]+", ignore_case = TRUE))
-```
-
-### Exercise 4
-
-Extract all words with two consecutive vowels.
-
-```{r baseball4, exercise=TRUE}
-
-```
-
-```{r baseball4-solution}
-str_extract_all(baseball, regex("[a-z]*[aeiou]{2}[a-z]*", ignore_case = TRUE))
-```
-
-### Exercise 5
-
-Extract all words with a repeated letter.
-
-```{r baseball5, exercise=TRUE}
-
-```
-
-```{r baseball5-solution}
-str_extract_all(baseball, regex("[a-z]*([a-z])\\1[a-z]*", ignore_case = TRUE))
-```
