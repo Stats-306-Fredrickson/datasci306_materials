@@ -130,7 +130,7 @@ mutate(aatemp, TMAX_myscale = scale_IQR(TMAX)) |>
 
 ```{r}
 aat_year <- group_by(aatemp, year(DATE))
-summarize(aat_year, scale_IQR(TMAX)) |>
+mutate(aat_year, scale_IQR(TMAX)) |>
   ggplot(aes(x = factor(`year(DATE)`), y = `scale_IQR(TMAX)`)) +
     geom_violin()
 ```
