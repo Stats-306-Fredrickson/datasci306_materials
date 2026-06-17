@@ -1,0 +1,484 @@
+---
+subtitle: "Data Science 306: Lecture 27"
+title: "Exploratory Data Analysis and Modeling"
+output:
+  learnr::tutorial:
+    progressive: true
+    css: css/lecture.css
+runtime: shiny_prerendered
+---
+
+
+```{r setup, include=FALSE}
+library(learnr)
+library(tidyverse)
+library(Lahman)   # install.packages("Lahman") if you don't have this
+library(broom)
+library(modelr)
+theme_set(theme_bw())
+wae <- read_tsv("data/WikiArt-Emotions-All.tsv.gz") |>
+  mutate(year4 = substring(Year, 1, 4),
+         year4_num = as.numeric(year4))
+People_clean <- filter(People, !is.na(weight))
+set.seed(2939394)
+```
+
+## Overview
+
+When you first meet a data set, you do not yet know what questions to ask of it.
+**Exploratory Data Analysis (EDA)** is the process of finding out -- and once we
+spot a relationship, a **model** lets us describe it with a number. In this
+lecture:
+
+* What EDA is, and how it differs from inference
+* Describing **variation** in a single measurement (the ECDF, histograms,
+  density plots)
+* Describing **covariation** between measurements (conditional distributions,
+  stratifying, smoothing)
+* Modeling the **conditional mean** with linear regression, polynomials, and
+  loess
+
+## What is EDA?
+
+**Exploratory Data Analysis** is the process of learning about a data source and
+generating questions about it. It is **informal** and **data-driven**:
+
+* Generate questions about your data.
+* Search for answers by visualizing, transforming, and modeling.
+* Use what you learn to refine your questions and ask new ones.
+
+The goal at this stage is *quantity* of questions over polish. Getting a clean
+answer is nice, but not yet required.
+
+## EDA vs. inference
+
+EDA is about the data set **in front of you**.
+
+**Inference** is about making informed guesses about data you **did not**
+observe -- estimating, testing hypotheses, or predicting with the aid of a
+statistical model.
+
+EDA helps you generate the questions that inference can then answer more
+forcefully.
+
+## John Tukey, father of EDA
+
+<center>
+
+![John Tukey](images/John_Tukey.jpg)
+
+</center>
+
+>* The best thing about being a statistician is that you get to play in
+>  everyone's backyard.
+>* The first task of the analyst of data is quantitative detective work.
+>* Far better an approximate answer to the right question, which is often vague,
+>  than an exact answer to the wrong question, which can always be made precise.
+
+## The big question: variation
+
+If every observation had the same value, one number (or one category) would
+describe the whole data set. Usually they differ -- they exhibit **variation**,
+and describing it is the central task of EDA.
+
+* The **distribution** of a measurement is the set of possible values and how
+  often each occurs.
+* We start with one measurement at a time (its **marginal distribution**), then
+  look at how measurements vary *together* (**covariation**).
+
+## Reminder: types of data
+
+How we describe a distribution depends on the kind of measurement:
+
+>* **Nominal / categorical**: one of a fixed set of categories.
+>* **Ordinal**: categories that can be ordered.
+>* **Quantitative**: numeric values, possibly infinitely many.
+
+## A quick aside: your tools are the tidyverse
+
+We are about to compute summaries with `count`, `group_by`, `summarize`, and
+`ggplot`. In the last lecture we saw that a **package** bundles up functions and
+data to share -- and here is something we have kept quiet all term: almost every
+function you have used comes from a package, and they belong to one family, the
+**tidyverse**. Calling `library(tidyverse)` loads them all at once:
+
+| What you have been doing                                                | Package     |
+|-------------------------------------------------------------------------|-------------|
+| Reading data files (`read_csv`)                                         | `readr`     |
+| Storing data in tibbles (`tibble`)                                      | `tibble`    |
+| Transforming data (`filter`, `mutate`, `group_by`, `summarize`, joins)  | `dplyr`     |
+| Reshaping and tidying (`pivot_longer`, `pivot_wider`)                   | `tidyr`     |
+| Plotting (`ggplot`, the geoms)                                          | `ggplot2`   |
+| Working with strings (`str_*`)                                          | `stringr`   |
+| Working with factors (`fct_*`)                                          | `forcats`   |
+| Iterating (`map`, `map_dbl`)                                            | `purrr`     |
+
+The tidyverse is a *collection* of packages, each owning one part of the
+workflow, all designed to fit together. The data-transforming functions in
+particular -- `filter()`, `select()`, `mutate()`, `group_by()`, `summarize()`,
+`arrange()`, and the joins -- are the **`dplyr`** package, which we lean on
+constantly. With our tools named, let's use them to explore.
+
+## Categorical distributions: counts
+
+When observations fall into a fixed set of values, a table of counts describes
+the distribution:
+
+```{r}
+count(People, bats)
+```
+
+This is the same as grouping and counting:
+
+```{r}
+People |> group_by(bats) |> summarize(n = n())
+```
+
+## From counts to proportions
+
+Counts are easier to compare as **proportions** -- the share of the data set in
+each category:
+
+$$\frac{\text{number in group}}{\text{size of data set}}$$
+
+```{r}
+People |> group_by(bats) |> summarize(n = n()) |> mutate(prop = n / sum(n))
+```
+
+## A proportion is a mean
+
+Here is a useful idea we will lean on. Suppose we want the proportion of players
+weighing 200 lbs or less. The condition `weight <= 200` is a vector of
+`TRUE`/`FALSE`, and R treats `TRUE` as 1 and `FALSE` as 0, so the **mean of the
+condition is the proportion** that satisfy it:
+
+```{r}
+People_clean |> summarize(mean(weight <= 200))
+```
+
+## Quantitative: the ECDF
+
+For a numeric measurement there are too many distinct values to count, but we
+can describe the **empirical cumulative distribution function** (ECDF):
+
+$$\hat F(x) = \text{proportion of observations} \le x$$
+
+This is exactly the "mean of a condition" idea, evaluated at every `x`.
+
+```{r}
+ggplot(People_clean, aes(x = weight)) +
+  stat_ecdf() +
+  ylab("Proportion less than or equal to x")
+```
+
+## Reading the ECDF
+
+The ECDF answers "what proportion is in a range?" by subtraction. The proportion
+between 200 and 250 lbs is $\hat F(250) - \hat F(200)$:
+
+```{r}
+People_clean |> summarize(mean(weight <= 250) - mean(weight <= 200))
+```
+
+## From ECDF to histogram
+
+Chopping the range into bins and reporting the count in each gives a
+**histogram** -- a more familiar picture of the same distribution:
+
+```{r}
+ggplot(People_clean, aes(x = weight)) + geom_histogram(bins = 30)
+```
+
+## Choosing bin width
+
+The picture depends on the bin width. Too few bins hides structure; too many is
+all noise:
+
+```{r}
+ggplot(wae, aes(x = `Ave. art rating`)) + geom_histogram(bins = 1)
+ggplot(wae, aes(x = `Ave. art rating`)) + geom_histogram(bins = 500)
+ggplot(wae, aes(x = `Ave. art rating`)) + geom_histogram(bins = 50)
+```
+
+Always try a few bin widths before trusting a histogram.
+
+## Density plots
+
+A histogram also depends on *where* the bins start. A **density plot** averages
+over all starting positions, giving a smooth estimate; its smoothness is set by
+a **bandwidth** (analogous to bin width):
+
+```{r}
+ggplot(wae, aes(x = `Ave. art rating`)) + geom_density()
+```
+
+```{r}
+ggplot(wae, aes(x = `Ave. art rating`)) + geom_density(bw = 0.03)  # too noisy
+```
+
+## What to look for
+
+With our goal of understanding variation, scan each plot for:
+
+* A **typical** value -- where is the center?
+* **Clustering** -- one peak or several (multiple modes)? Tight or spread out?
+* **Where the variation lives** -- more spread among small values or large?
+* Anything **surprising** -- gaps, spikes, outliers worth investigating.
+
+## Missing values
+
+Real data is rarely complete. R marks missing values with `NA`, and `is.na()`
+detects them. Parsing `wae`'s `Year` to a number produces some:
+
+```{r}
+wae |> summarize(missing_year = mean(is.na(year4_num)))
+```
+
+Ways to handle missingness:
+
+* **Drop** the rows (`drop_na()`, or `na.rm = TRUE` in many functions).
+* **Impute** a simple guess (e.g., the mean of the observed values).
+* **Model** the missing values from the other variables.
+
+Always notice *how much* is missing before deciding.
+
+## Covariation
+
+So far, one measurement at a time. The more interesting questions are about
+**covariation**: how do two measurements vary *together*? How we look depends on
+the types of the two variables.
+
+## Joint and conditional distributions
+
+For two variables $X$ and $Y$:
+
+* The **joint distribution** says how often each combination $(X, Y)$ occurs.
+* Fixing $X = x$ and looking at the $Y$ values gives a **conditional
+  distribution** of $Y$ given $X = x$.
+
+Conditional distributions are often easier to work with -- especially when we
+condition on a categorical variable.
+
+## Stratifying on a category
+
+To condition on a (rounded) happiness rating, we **stratify** -- group by it --
+and summarize the rating in each group:
+
+```{r}
+wae |>
+  mutate(happy_round = round(`Art (image+title): happiness`, 1)) |>
+  group_by(happy_round) |>
+  summarize(median = median(`Ave. art rating`),
+            mean   = mean(`Ave. art rating`))
+```
+
+A **violin plot** shows the whole conditional distribution in each stratum:
+
+```{r}
+wae |>
+  mutate(happy_round = round(`Art (image+title): happiness`, 1)) |>
+  ggplot(aes(x = factor(happy_round), y = `Ave. art rating`)) + geom_violin()
+```
+
+## Two quantitative variables
+
+When both variables are quantitative, start with a scatterplot; where points
+overplot, a 2D histogram shows where the data piles up:
+
+```{r warning = FALSE}
+ggplot(wae, aes(x = year4_num, y = `Ave. art rating`)) + geom_bin2d()
+```
+
+## Conditional means by stratifying
+
+We can condition a continuous $X$ by cutting it into intervals and taking the
+**mean of $Y$** in each -- a set of conditional means:
+
+```{r warning = FALSE}
+wae |>
+  mutate(year_cat = cut_width(year4_num, 100)) |>
+  group_by(year_cat) |>
+  summarize(mean_rating = mean(`Ave. art rating`))
+```
+
+## Smoothing: loess
+
+Cutting into bins is clumsy. **Locally weighted regression** (loess) estimates
+the conditional mean of $Y$ smoothly across $X$ -- a trend line that follows the
+data:
+
+```{r warning = FALSE}
+ggplot(wae, aes(x = year4_num, y = `Ave. art rating`)) +
+  geom_point(alpha = 0.3) +
+  geom_smooth()
+```
+
+That smooth curve *is* an estimate of "the average rating, given the year."
+
+## From description to models
+
+A loess curve gave us conditional means without a formula. But we often want to
+describe a relationship with a specific **number** -- a slope -- rather than a
+picture, and to reason about it. For that we use **models**, which estimate the
+**conditional mean**
+
+$$E[Y \mid X = x] = \text{the average } Y \text{ among observations with } X = x.$$
+
+To see modeling clearly, let's switch to a cleaner two-variable example: engine
+size (`displ`) and highway mileage (`hwy`) in the `mpg` data.
+
+## Linear regression
+
+The workhorse is `lm()` (linear model). We give it a **formula**,
+`response ~ predictor`, and a data frame:
+
+```{r}
+fit <- lm(hwy ~ displ, data = mpg)
+fit
+```
+
+The formula `hwy ~ displ` reads "model highway mileage as a function of engine
+displacement." `lm()` finds the line -- a conditional mean $\widehat{hwy} = b_0 +
+b_1 \cdot displ$ -- that best fits the data.
+
+## A fitted model is an object
+
+Remember from the OOP lecture: everything in R is an object with a class. A
+fitted model is no exception.
+
+```{r}
+class(fit)
+```
+
+It is an S3 object of class `"lm"` built on a list. When you print `fit` or call
+`summary(fit)`, that is **method dispatch** -- R calls `print.lm()` and
+`summary.lm()`, the same generics we have used all term, specialized for models.
+
+## Tidy model output with `broom`
+
+`summary(fit)` is made to be *read*, not *computed with*. The **`broom`** package
+turns a model into tidy tibbles with three functions:
+
+```{r}
+tidy(fit)      # one row per coefficient
+```
+
+```{r}
+glance(fit)    # one row of overall fit statistics
+```
+
+The slope from `tidy(fit)` says highway mileage drops by about 3.5 mpg for each
+1-liter increase in displacement -- a single number summarizing the
+relationship, exactly what EDA was reaching for.
+
+## Predictions and residuals with `modelr`
+
+The **`modelr`** package adds the model's view back onto the data as ordinary
+columns: `add_predictions()` adds the fitted conditional mean, and
+`add_residuals()` adds what the line missed (`actual - predicted`):
+
+```{r}
+mpg |>
+  add_predictions(fit) |>
+  add_residuals(fit) |>
+  select(displ, hwy, pred, resid) |>
+  head()
+```
+
+## Residuals send us back to EDA
+
+The residuals are the leftovers. If the model captured the relationship, they
+should look like featureless noise around 0 -- so we do **EDA on the
+residuals**:
+
+```{r}
+mpg |>
+  add_residuals(fit) |>
+  ggplot(aes(displ, resid)) +
+  geom_hline(yintercept = 0, color = "grey60") +
+  geom_point(alpha = 0.4) +
+  geom_smooth(se = FALSE)
+```
+
+There is a clear **U-shape** left over: the line over- and under-predicts in a
+systematic way. A straight conditional mean is too rigid here.
+
+## When a line is not enough: polynomial regression
+
+We can let the conditional mean **curve** while staying within `lm()`, by adding
+a squared term with `poly()`:
+
+```{r}
+fit2 <- lm(hwy ~ poly(displ, 2), data = mpg)
+
+mpg |>
+  add_predictions(fit2) |>
+  ggplot(aes(displ, hwy)) +
+  geom_point(alpha = 0.4) +
+  geom_line(aes(y = pred), color = "darkgreen", linewidth = 1)
+```
+
+This is still linear regression -- still `lm`, still a conditional mean we can
+write as a formula -- but now it bends, and its residuals lose most of that
+U-shape.
+
+## loess again -- now as a model
+
+We met **loess** earlier as an EDA smoother. It belongs here too: it estimates
+the conditional mean *locally*, fitting a little regression near each $x$, with
+no global formula at all. The `span` argument controls how smooth it is:
+
+```{r}
+ggplot(mpg, aes(displ, hwy)) +
+  geom_point(alpha = 0.4) +
+  geom_smooth(method = "loess", span = 0.75, se = FALSE, color = "red")
+```
+
+## Three views of one conditional mean
+
+All three estimate $E[hwy \mid displ]$ -- they trade simplicity for flexibility:
+
+```{r}
+ggplot(mpg, aes(displ, hwy)) +
+  geom_point(alpha = 0.3) +
+  geom_smooth(method = "lm", se = FALSE, aes(color = "1: linear")) +
+  geom_smooth(method = "lm", formula = y ~ poly(x, 2), se = FALSE, aes(color = "2: quadratic")) +
+  geom_smooth(method = "loess", se = FALSE, aes(color = "3: loess")) +
+  labs(color = NULL)
+```
+
+* **Linear**: one slope, easy to interpret and extrapolate, but can miss
+  curvature.
+* **Polynomial**: still a formula, bends to fit, but can behave wildly past the
+  data.
+* **loess**: follows the data closely with no formula, but is local -- it cannot
+  predict outside the observed range.
+
+## Exercise
+
+Fit `lm(hwy ~ displ)` separately for each `drv` (drivetrain) using
+`geom_smooth(method = "lm")` with `color = drv`. Does the relationship between
+displacement and mileage look the same for all three drivetrains?
+
+```{r drv-models, exercise = TRUE}
+
+```
+
+## Summary
+
+* **EDA** is the informal, data-driven search for good questions: describe
+  variation, then covariation.
+* One variable: **counts/proportions** for categories; the **ECDF**,
+  **histograms**, and **density plots** for quantitative data. A **proportion is
+  the mean of a condition**.
+* Two variables: **conditional distributions** via stratifying and violins;
+  scatter and 2D histograms; **loess** gives a smooth conditional mean.
+* A **model** estimates the **conditional mean** $E[Y \mid X]$: `lm()` fits a
+  line (an S3 object); `broom` tidies its output and `modelr` adds
+  predictions/residuals.
+* **Residuals are EDA's feedback loop**; **polynomial regression** and **loess**
+  give more flexible conditional means, trading interpretability for
+  flexibility.
+
+Reading: [R for Data Science (2e), "EDA"](https://r4ds.hadley.nz/eda) and
+[(1e) "Model basics"](https://r4ds.had.co.nz/model-basics.html).

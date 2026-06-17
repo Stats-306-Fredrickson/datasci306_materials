@@ -18,6 +18,10 @@ runtime: shiny_prerendered
 if (!require(gapminder)) install.packages("gapminder", repos = "http://cran.us.r-project.org")
 
 if (!require(nycflights13)) install.packages("nycflights13")
+
+if (!require(broom)) install.packages("broom", repos = "http://cran.us.r-project.org")
+
+if (!require(modelr)) install.packages("modelr", repos = "http://cran.us.r-project.org")
 ```
 
 ```{r setup, echo=FALSE, include=FALSE}
@@ -26,6 +30,9 @@ library(tidyverse) # For ggplot2, dplyr
 library(gapminder)
 library(ggmap)
 library(nycflights13)
+library(broom)  # tidy model output
+library(modelr) # predictions and residuals
+gap07 <- filter(gapminder, year == 2007)  # used in the modeling extension
 ```
 
 
@@ -367,4 +374,148 @@ gapminder %>%
   ## make the color tibbles map to the specified colors in the geom_line aesthetics
   scale_color_manual(values = plt_colors) +
   theme_bw()
+```
+
+## Extension: From EDA to Models
+
+EDA showed us **covariation** -- two variables varying together -- with
+scatterplots and with conditional summaries (boxplots over `cut_width`). The next
+step is to describe a relationship with a **number** instead of a picture, using
+a **model**.
+
+A model estimates the **conditional mean**
+
+$$E[Y \mid X = x] = \text{the average } Y \text{ among observations with } X = x.$$
+
+We will use the `gapminder` data for the year 2007 (`gap07`), modeling life
+expectancy as a function of GDP per capita.
+
+```{r}
+ggplot(gap07, aes(gdpPercap, lifeExp)) + geom_point()
+```
+
+The relationship clearly is not a straight line -- life expectancy rises
+quickly, then levels off. Keep that in mind.
+
+## Linear regression with `lm`
+
+`lm()` fits a linear model from a formula `response ~ predictor`:
+
+```{r}
+m1 <- lm(lifeExp ~ gdpPercap, data = gap07)
+```
+
+The `broom` package turns the fitted model into tidy tibbles. `tidy()` gives one
+row per coefficient; `glance()` gives one row of overall fit:
+
+```{r}
+tidy(m1)
+glance(m1)
+```
+
+The `gdpPercap` slope is about `0.00064` -- i.e., roughly **0.64 extra years of
+life expectancy per additional \$1000** of GDP per capita.
+
+## Predictions and residuals with `modelr`
+
+`modelr` adds the model's view back onto the data as columns: `add_predictions()`
+adds the fitted conditional mean (`pred`), and `add_residuals()` adds what the
+model missed (`resid = actual - predicted`).
+
+```{r}
+gap07 |>
+  add_predictions(m1) |>
+  ggplot(aes(gdpPercap, lifeExp)) +
+  geom_point(alpha = 0.5) +
+  geom_line(aes(y = pred), color = "blue", linewidth = 1)
+```
+
+The straight line cannot follow the curve. We can see this most clearly by doing
+**EDA on the residuals** -- if the model fit well, they would be featureless
+noise around 0:
+
+```{r}
+gap07 |>
+  add_residuals(m1) |>
+  ggplot(aes(gdpPercap, resid)) +
+  geom_hline(yintercept = 0, color = "grey60") +
+  geom_point(alpha = 0.5) +
+  geom_smooth(se = FALSE)
+```
+
+A clear pattern remains: the line systematically over- and under-predicts. A
+straight conditional mean is too rigid here.
+
+## More flexible conditional means
+
+We can let the conditional mean bend. **Polynomial regression** stays within
+`lm()` by adding a squared term; **loess** fits a local regression near each `x`
+with no global formula. All three estimate $E[\text{lifeExp} \mid \text{gdpPercap}]$:
+
+```{r}
+ggplot(gap07, aes(gdpPercap, lifeExp)) +
+  geom_point(alpha = 0.4) +
+  geom_smooth(method = "lm", se = FALSE, aes(color = "1: linear")) +
+  geom_smooth(method = "lm", formula = y ~ poly(x, 2), se = FALSE, aes(color = "2: quadratic")) +
+  geom_smooth(method = "loess", se = FALSE, aes(color = "3: loess")) +
+  labs(color = NULL)
+```
+
+### Exercise 3
+
+The shape above looks **logarithmic**. Fit a linear model of `lifeExp` on
+`log(gdpPercap)`, print its `glance()`, and compare the `r.squared` to that of
+`m1` (the model on the raw `gdpPercap`). Which fits better?
+
+```{r challenge3, exercise=TRUE}
+
+```
+
+```{r challenge3-solution}
+m_log <- lm(lifeExp ~ log(gdpPercap), data = gap07)
+glance(m_log)$r.squared   # ~0.65: much higher than m1's ~0.46
+glance(lm(lifeExp ~ gdpPercap, data = gap07))$r.squared
+# Logging gdpPercap straightens out the curve, so the line fits much better.
+```
+
+### Exercise 4
+
+Residuals send us back to EDA. Add the residuals from `m1` to `gap07`, then make
+a **boxplot of the residuals by `continent`**, with a horizontal line at 0. Does
+the linear model miss systematically for some continents?
+
+```{r challenge4, exercise=TRUE}
+
+```
+
+```{r challenge4-solution}
+gap07 |>
+  add_residuals(m1) |>
+  ggplot(aes(continent, resid)) +
+  geom_hline(yintercept = 0, color = "grey60") +
+  geom_boxplot()
+# Yes: residuals are mostly negative for Africa and positive for Europe/Oceania,
+# so the single line misses a continent effect -- a cue to add continent to the model.
+```
+
+### Exercise 5
+
+Fit a **quadratic** model `lifeExp ~ poly(gdpPercap, 2)` and use `modelr`'s
+`add_residuals()` to plot its residuals against `gdpPercap` (with a line at 0).
+Does the quadratic remove the pattern the straight line left behind?
+
+```{r challenge5, exercise=TRUE}
+
+```
+
+```{r challenge5-solution}
+m2 <- lm(lifeExp ~ poly(gdpPercap, 2), data = gap07)
+gap07 |>
+  add_residuals(m2) |>
+  ggplot(aes(gdpPercap, resid)) +
+  geom_hline(yintercept = 0, color = "grey60") +
+  geom_point(alpha = 0.5) +
+  geom_smooth(se = FALSE)
+# The curve flattens the worst of the pattern, though some structure remains
+# (a log transform, from Exercise 3, does even better).
 ```
