@@ -1,0 +1,37 @@
+@media screen and (max-width: 4000px) {
+  .bandContent {
+    margin: 0 auto;
+    max-width: 100%;
+  }
+  .band { padding: 0 1em 0 1em; }
+
+  .topics {
+    font-size: 1.5em;
+  }
+  
+  .topics code {
+    font-size: 1.5em;
+  }
+  
+  .topicsList {
+    width: 5em;
+  }
+  .topicsContainer .tutorialTitle {
+    font-size: 1.5em;
+  }
+  h2.subtitle {
+    font-size: 1.25em;
+  } 
+  .topicsContainer .topic {
+    font-size: 1em;
+  }
+  
+
+}
+
+.str_view .match {
+  color: #FF0000;
+  font-weight: bold;
+    border: 1px solid #ccc;
+    background-color: #ffeeee;
+}

@@ -1,0 +1,28 @@
+
+# Average highway mileage by manufacturer (2008)
+SELECT manufacturer, AVG(hwy) AS mean_hwy
+        FROM mpg
+        WHERE year = 2008
+        GROUP BY manufacturer
+        ORDER BY mean_hwy DESC
+        LIMIT 5
+-> result:
+   manufacturer | mean_hwy
+   honda | 33.75
+   volkswagen | 28.545454545454547
+   hyundai | 27.0
+   audi | 26.77777777777778
+   pontiac | 26.5
+
+# Classes with more than 30 cars (GROUP BY + HAVING)
+SELECT class, COUNT(*) AS n, AVG(hwy) AS mean_hwy
+        FROM mpg
+        GROUP BY class
+        HAVING n > 30
+-> result:
+   class | n | mean_hwy
+   compact | 47 | 28.29787234042553
+   midsize | 41 | 27.29268292682927
+   pickup | 33 | 16.87878787878788
+   subcompact | 35 | 28.142857142857142
+   suv | 62 | 18.129032258064516

@@ -1,0 +1,744 @@
+---
+subtitle: "Data Science 306: Lecture 28"
+title: "Databases and SQL from R"
+output:
+  learnr::tutorial:
+    progressive: true
+    css: css/lecture.css
+runtime: shiny_prerendered
+---
+
+
+```{r setup, include=FALSE}
+library(learnr)
+library(tidyverse)
+library(DBI)
+library(RSQLite)        # install.packages("RSQLite")
+library(duckdb)         # install.packages("duckdb")
+library(dbplyr)         # install.packages("dbplyr")
+library(nycflights13)   # install.packages("nycflights13")
+theme_set(theme_bw())
+
+# `con` lives here (not in a slide) because learnr exercises inherit only the
+# setup chunk's environment, and the exercises run against `con`. The DuckDB
+# connection is created later in its own slide.
+con <- dbConnect(RSQLite::SQLite(), ":memory:")
+dbWriteTable(con, "mpg",              ggplot2::mpg)
+dbWriteTable(con, "band_members",     dplyr::band_members)
+dbWriteTable(con, "band_instruments", dplyr::band_instruments)
+dbWriteTable(con, "flights",          nycflights13::flights)
+dbWriteTable(con, "airlines",         nycflights13::airlines)
+```
+
+## Overview
+
+Our data has lived in files read entirely into memory. When that stops working:
+
+* **Databases** -- where most real data lives, and why
+* **SQL** -- the standard query language, across databases *and* languages
+* **`DBI`** -- connect from R and send SQL
+* **`dbplyr`** -- `dplyr` that runs *inside* the database
+* **Two engines** -- **SQLite**, then **DuckDB** (queries **Parquet** directly);
+  plus the same SQL run from **Python**
+
+## Why a database?
+
+A **database** is a separate program built for data:
+
+* **Size** -- bigger than RAM; reads only what a query needs
+* **Efficiency** -- structured for fast filters and joins
+* **Persistence** -- lives on disk, not your R session
+* **Concurrency** -- many users read/write at once
+* **One source of truth** -- no more `final_data_v3_REAL.csv` by email
+* **Distributed** -- can be split across machines (*sharding*)
+* **Standardized** -- many languages share the same data
+
+Most are **relational**: tables linked by keys -- our *joins*.
+
+## Talking to a database: `DBI`
+
+R talks to any database through **`DBI`** plus a **backend** package:
+
+* `RSQLite` -- tiny, self-contained, in a single file; what we use today
+* `RPostgres`, `RMariaDB`, `bigrquery` -- production databases and warehouses
+
+Same interface regardless of backend: connect, work, disconnect.
+
+```{r}
+# open a brand-new, empty in-memory SQLite database
+tmp_con <- dbConnect(RSQLite::SQLite(), ":memory:")
+
+# copy a tibble into it as a table
+dbWriteTable(tmp_con, "mpg", ggplot2::mpg)
+
+# what tables exist now?
+dbListTables(tmp_con)
+
+dbDisconnect(tmp_con)   # always close a connection when finished
+```
+
+`con` (used all lecture) was opened the same way behind the scenes. It holds:
+
+```{r}
+dbListTables(con)
+```
+
+## Sending SQL directly
+
+**SQL** is the database's native language; send it with `dbGetQuery()`:
+
+```{r}
+dbGetQuery(con, "
+  SELECT manufacturer, AVG(hwy) AS mean_hwy
+  FROM mpg
+  WHERE year = 2008
+  GROUP BY manufacturer
+  ORDER BY mean_hwy DESC
+")
+```
+
+Same shape as a `dplyr` pipeline.
+
+## Anatomy of a `SELECT`
+
+One `SELECT` statement, clauses in a fixed order:
+
+```sql
+SELECT   columns and summaries you want back
+FROM     which table
+WHERE    keep only rows matching a condition
+GROUP BY split rows into groups
+ORDER BY sort the result
+LIMIT    keep only the first n rows
+```
+
+Only `SELECT` and `FROM` are required:
+
+```{r}
+dbGetQuery(con, "SELECT manufacturer, model, hwy FROM mpg LIMIT 5")
+```
+
+`SELECT *` -- every column:
+
+```{r}
+dbGetQuery(con, "SELECT * FROM mpg LIMIT 3")
+```
+
+## `WHERE`: keeping rows
+
+`WHERE` is `filter()` -- keep matching rows (`=`, not `==`; combine with
+`AND` / `OR`):
+
+```{r}
+dbGetQuery(con, "
+  SELECT manufacturer, model, year, hwy
+  FROM mpg
+  WHERE hwy > 30 AND year = 2008
+")
+```
+
+Handy idioms: `IN (...)` (like `%in%`), `BETWEEN a AND b`, `LIKE` (`%` = any
+characters):
+
+```{r}
+dbGetQuery(con, "
+  SELECT DISTINCT manufacturer
+  FROM mpg
+  WHERE manufacturer IN ('audi', 'honda')
+     OR manufacturer LIKE 'to%'
+")
+```
+
+## Exercise: `SELECT` + `WHERE`
+
+We'll grow one query over the next few exercises. To start: from `mpg`, select
+`manufacturer`, `model`, and `hwy`, keeping only **2008 cars with `hwy` of at
+least 30**.
+
+```{r ex-where, exercise = TRUE}
+dbGetQuery(con, "
+  SELECT...") 
+
+```{r ex-where-solution}
+dbGetQuery(con, "
+  SELECT manufacturer, model, hwy
+  FROM mpg
+  WHERE year = 2008 AND hwy >= 30
+")
+```
+
+## `GROUP BY` and aggregates
+
+`GROUP BY` + **aggregates** (`COUNT(*)`, `SUM`, `AVG`, `MIN`, `MAX`) is
+`group_by() |> summarize()`:
+
+```{r}
+dbGetQuery(con, "
+  SELECT class,
+         COUNT(*)  AS n,
+         AVG(hwy)  AS mean_hwy,
+         MIN(hwy)  AS worst,
+         MAX(hwy)  AS best
+  FROM mpg
+  GROUP BY class
+  ORDER BY mean_hwy DESC
+")
+```
+
+## Exercise: group and summarize
+
+Now summarize instead of listing rows: for each `class`, return the count and
+the (rounded) average `hwy`. Hint: remember `COUNT`, `ROUND`, and `AVG`.
+
+```{r ex-groupby, exercise = TRUE}
+dbGetQuery(con, "
+
+")
+```
+
+```{r ex-groupby-solution}
+dbGetQuery(con, "
+  SELECT class, COUNT(*) AS n, ROUND(AVG(hwy), 1) AS mean_hwy
+  FROM mpg
+  GROUP BY class
+")
+```
+
+## `WHERE` vs `HAVING`
+
+`WHERE` filters rows *before* grouping; `HAVING` filters groups *after*:
+
+```{r}
+dbGetQuery(con, "
+  SELECT class, COUNT(*) AS n, AVG(hwy) AS mean_hwy
+  FROM mpg
+  GROUP BY class
+  HAVING n > 30
+")
+```
+
+`HAVING` = a `filter()` after `summarize()`.
+
+## Exercise: filter the groups
+
+Extend your class summary: keep only classes with **more than 30 cars**, sorted
+by average `hwy` (highest first).
+
+```{r ex-having, exercise = TRUE}
+dbGetQuery(con, "
+  SELECT class, COUNT(*) AS n, ROUND(AVG(hwy), 1) AS mean_hwy
+  FROM mpg
+  GROUP BY class
+  -- keep only big classes, then sort
+")
+```
+
+```{r ex-having-solution}
+dbGetQuery(con, "
+  SELECT class, COUNT(*) AS n, ROUND(AVG(hwy), 1) AS mean_hwy
+  FROM mpg
+  GROUP BY class
+  HAVING n > 30
+  ORDER BY mean_hwy DESC
+")
+```
+
+## Building up: common table expressions (`WITH`)
+
+`WITH name AS (...)` names an intermediate result instead of nesting -- reads
+top-to-bottom, like piped steps:
+
+```{r}
+dbGetQuery(con, "
+  WITH class_stats AS (
+    SELECT class, COUNT(*) AS n, AVG(hwy) AS mean_hwy
+    FROM mpg
+    GROUP BY class
+  )
+  SELECT class, mean_hwy
+  FROM class_stats
+  WHERE n > 30
+  ORDER BY mean_hwy DESC
+")
+```
+
+## Ranking within groups: window functions
+
+A **window function** computes across a group but keeps **every row**
+(`OVER (PARTITION BY ...)`) -- e.g. rank within group:
+
+```{r}
+dbGetQuery(con, "
+  SELECT manufacturer, model, hwy,
+         RANK() OVER (PARTITION BY manufacturer ORDER BY hwy DESC) AS hwy_rank
+  FROM mpg
+  WHERE manufacturer IN ('toyota', 'honda')
+  ORDER BY manufacturer, hwy_rank
+  LIMIT 8
+")
+```
+
+Like `group_by() |> mutate()` -- the rows survive (unlike `summarize()`).
+
+## Exercise: rank within a group
+
+Rank cars by `hwy` **within each `class`** (highest = rank 1). Return `class`,
+`model`, `hwy`, and the rank.
+
+```{r ex-window, exercise = TRUE}
+dbGetQuery(con, "
+
+")
+```
+
+```{r ex-window-solution}
+dbGetQuery(con, "
+  SELECT class, model, hwy,
+         RANK() OVER (PARTITION BY class ORDER BY hwy DESC) AS hwy_rank
+  FROM mpg
+  ORDER BY class, hwy_rank
+")
+```
+
+## `SELECT` is `dplyr` in a different order
+
+| `dplyr`                  | SQL                                          |
+|--------------------------|----------------------------------------------|
+| `select()`               | `SELECT`                                     |
+| `filter()`               | `WHERE`                                      |
+| `group_by()`             | `GROUP BY`                                   |
+| `summarize()`            | aggregates in `SELECT` (`AVG`, `COUNT`, ...) |
+| `filter()` after summarize | `HAVING`                                   |
+| `arrange()`              | `ORDER BY`                                   |
+| `arrange(desc(x))`       | `ORDER BY x DESC`                            |
+| `head(n)` / `slice()`    | `LIMIT n`                                    |
+| `mutate()` / `rename()`  | expressions / `AS` in `SELECT`               |
+| `left_join()` etc.       | `... JOIN ... ON ...`                         |
+  
+* **Declarative** -- you describe the result; the *query planner* picks how.
+* Written `SELECT…FROM…WHERE…GROUP BY…HAVING…ORDER BY…LIMIT`, but *run*
+  `FROM → WHERE → GROUP BY → HAVING → SELECT → ORDER BY → LIMIT`.
+
+## Why filters and joins are fast: indexes
+
+An **index** lets the database jump to matching rows instead of scanning.
+`EXPLAIN QUERY PLAN` shows the plan -- no index means a full **scan**:
+
+```{r}
+dbGetQuery(con, "EXPLAIN QUERY PLAN SELECT * FROM flights WHERE origin = 'EWR'")
+```
+
+Add an index and ask again:
+
+```{r}
+dbExecute(con, "CREATE INDEX idx_origin ON flights(origin)")
+dbGetQuery(con, "EXPLAIN QUERY PLAN SELECT * FROM flights WHERE origin = 'EWR'")
+```
+
+**`SCAN`** → **`SEARCH ... USING INDEX`**: same answer, no full scan. (Costs
+storage and upkeep.)
+
+## Joining tables in SQL
+
+Data split across tables linked by keys; `JOIN ... ON` recombines them:
+
+```{r}
+dbGetQuery(con, "SELECT * FROM band_members")
+dbGetQuery(con, "SELECT * FROM band_instruments")
+```
+
+**Inner join** -- keep only matches; `ON` names the key:
+
+```{r}
+dbGetQuery(con, "
+  SELECT band_members.name, band_members.band, band_instruments.plays
+  FROM band_members
+  JOIN band_instruments
+    ON band_members.name = band_instruments.name
+")
+```
+
+= `inner_join(band_members, band_instruments, by = \"name\")`.
+
+## Left joins and table aliases
+
+`LEFT JOIN` keeps every left row (`NA` where no match); `AS` gives a table a
+short alias:
+
+```{r}
+dbGetQuery(con, "
+  SELECT m.name, m.band, i.plays
+  FROM band_members AS m
+  LEFT JOIN band_instruments AS i
+    ON m.name = i.name
+")
+```
+
+Join key → `ON`; `JOIN` / `LEFT JOIN` = `inner_join()` / `left_join()`.
+
+## A realistic join
+
+Same pattern at scale: `flights.carrier` → `airlines.name`, then aggregate:
+
+```{r}
+dbGetQuery(con, "
+  SELECT a.name, COUNT(*) AS n_flights, AVG(f.dep_delay) AS mean_delay
+  FROM flights AS f
+  JOIN airlines AS a
+    ON f.carrier = a.carrier
+  GROUP BY a.name
+  ORDER BY mean_delay DESC
+  LIMIT 5
+")
+```
+
+Scanned all 336k rows, returned 5.
+
+## Exercise: join two tables
+
+Inner-join `flights` to `airlines` on `carrier`. For each airline `name`, return
+the flight count and average `arr_delay`, **best (lowest) average first**, top 5.
+
+```{r ex-join, exercise = TRUE}
+dbGetQuery(con, "
+  SELECT a.name, ___
+  FROM flights AS f
+  JOIN airlines AS a
+    ON ___
+  GROUP BY a.name
+  ___
+")
+```
+
+```{r ex-join-solution}
+dbGetQuery(con, "
+  SELECT a.name, COUNT(*) AS n, AVG(f.arr_delay) AS mean_arr_delay
+  FROM flights AS f
+  JOIN airlines AS a
+    ON f.carrier = a.carrier
+  GROUP BY a.name
+  ORDER BY mean_arr_delay ASC
+  LIMIT 5
+")
+```
+
+We could keep writing SQL by hand -- or let `dplyr` write it.
+
+## `dbplyr`: `dplyr` that runs in the database
+
+Point `tbl()` at a table, write `dplyr`; it's **translated to SQL** and run in
+the database:
+
+```{r}
+# a reference to the table -- NOT a copy of the data
+mpg_db <- tbl(con, "mpg")
+
+result <- mpg_db |>
+  filter(year == 2008) |>
+  group_by(manufacturer) |>
+  summarize(mean_hwy = mean(hwy, na.rm = TRUE)) |>
+  arrange(desc(mean_hwy))
+```
+
+Same code as on a tibble -- but notice: **no output** (next slide).
+
+## Lazy evaluation: nothing happens until you ask
+
+`dbplyr` is **lazy** -- building a pipeline runs nothing. It executes when you:
+
+* **print** it -- runs the query, previews a few rows
+* **`collect()`** -- pulls the *full* result into R as a tibble
+
+```{r}
+result            # builds + previews a few rows, still "in the database"
+```
+
+```{r}
+local_tbl <- result |> collect()   # NOW bring the whole result into R
+class(local_tbl)                   # an ordinary tibble we can plot, model, ...
+local_tbl
+```
+
+Laziness lets `dbplyr` fold the whole pipeline into **one** SQL query.
+
+## Seeing the generated SQL
+
+`show_query()` prints the SQL it will send -- great for learning and checking:
+
+```{r}
+result |> show_query()
+```
+
+Joins translate too:
+
+```{r}
+tbl(con, "flights") |>
+  left_join(tbl(con, "airlines"), by = "carrier") |>
+  group_by(name) |>
+  summarize(mean_delay = mean(dep_delay, na.rm = TRUE)) |>
+  show_query()
+```
+
+## Push work to the database, pull small results back
+
+**Do the work in the database; `collect()` only the small result.**
+
+```{r}
+# GOOD: shrink in the database, then collect ~15 rows
+summary_tbl <- tbl(con, "flights") |>
+  filter(dest == "DTW") |>
+  group_by(origin) |>
+  summarize(n = n(), mean_delay = mean(arr_delay, na.rm = TRUE)) |>
+  collect()
+
+summary_tbl
+```
+
+```{r}
+# BAD: collect all 336k rows first, then shrink (may not even fit)
+bad <- tbl(con, "flights") |>
+  collect() |>
+  filter(dest == "DTW") |>
+  group_by(origin) |>
+  summarize(n = n(), mean_delay = mean(arr_delay, na.rm = TRUE))
+```
+
+Same answer -- but `collect()` belongs at the **end**, after the data is small.
+
+## Exercise: fix the slow pipeline
+
+This `collect()`s the whole table first. Reorder it so the database filters and
+summarizes, with `collect()` **last**.
+
+```{r ex-reorder, exercise = TRUE}
+tbl(con, "flights") |>
+  collect() |>
+  filter(dest == "DTW") |>
+  summarize(mean_delay = mean(arr_delay, na.rm = TRUE))
+```
+
+```{r ex-reorder-solution}
+tbl(con, "flights") |>
+  filter(dest == "DTW") |>
+  summarize(mean_delay = mean(arr_delay, na.rm = TRUE)) |>
+  collect()
+```
+
+## Not everything translates
+
+Not every R function has a SQL equivalent. So divide the labor:
+
+* filter / join / group / aggregate **in the database** (shrinks the data)
+* `collect()` the small result
+* custom functions, modeling, **plotting** -- in R:
+
+```{r}
+tbl(con, "flights") |>
+  group_by(origin) |>
+  summarize(mean_delay = mean(dep_delay, na.rm = TRUE)) |>
+  collect() |>                       # <- leave the database here
+  ggplot(aes(origin, mean_delay)) +  # <- pure R from here on
+  geom_col()
+```
+
+## Not all databases are alike
+
+Databases differ along a few axes:
+
+>* **Embedded vs. client-server** -- in-process (SQLite, DuckDB) vs. a server you
+>  connect to (Postgres, BigQuery).
+>* **Row vs. column** -- row store = transactions (**OLTP**); column store =
+>  analytics (**OLAP**).
+>* **Relational vs. not** -- most speak SQL; some (document, key-value, graph)
+>  don't.
+
+SQLite is an embedded **row** store. For analytics, the fit is an embedded
+**column** store -- **DuckDB**.
+
+## A different engine: DuckDB
+
+**DuckDB** -- "SQLite for analytics": embedded (no server), but
+**column-oriented** and built for big scans and aggregates. Same `DBI`
+interface; only `dbConnect()` changes:
+
+```{r}
+duck <- dbConnect(duckdb::duckdb(), ":memory:")   # the one line that changes
+dbWriteTable(duck, "mpg", ggplot2::mpg)           # same dbWriteTable() as before
+dbListTables(duck)
+```
+
+## Same SQL, same `dbplyr`, different engine
+
+The opening query runs on DuckDB verbatim:
+
+```{r}
+dbGetQuery(duck, "
+  SELECT manufacturer, AVG(hwy) AS mean_hwy
+  FROM mpg
+  WHERE year = 2008
+  GROUP BY manufacturer
+  ORDER BY mean_hwy DESC
+  LIMIT 5
+")
+```
+
+And so does `dbplyr`:
+
+```{r}
+tbl(duck, "mpg") |>
+  group_by(drv) |>
+  summarize(mean_hwy = mean(hwy, na.rm = TRUE)) |>
+  arrange(desc(mean_hwy)) |>
+  collect()
+```
+
+Switching engines changed *one line*.
+
+## Query files directly
+
+DuckDB can query a **file on disk directly** -- no `dbWriteTable`, no loading.
+Point `FROM` at the file:
+
+```{r}
+dbGetQuery(duck, "
+  SELECT class, COUNT(*) AS n, ROUND(AVG(hwy), 1) AS mean_hwy
+  FROM 'mpg.csv'
+  GROUP BY class
+  ORDER BY n DESC
+  LIMIT 5
+")
+```
+
+The file *is* the table.
+
+## Exercise: query a file with DuckDB
+
+Open a DuckDB connection and query `mpg.csv` **directly** (no `dbWriteTable`):
+the count and average `hwy` for each `drv`, best average first.
+
+```{r ex-duck-file, exercise = TRUE}
+duck <- dbConnect(duckdb::duckdb(), ":memory:")
+dbGetQuery(duck, "
+
+")
+```
+
+```{r ex-duck-file-solution}
+duck <- dbConnect(duckdb::duckdb(), ":memory:")
+dbGetQuery(duck, "
+  SELECT drv, COUNT(*) AS n, ROUND(AVG(hwy), 1) AS mean_hwy
+  FROM 'mpg.csv'
+  GROUP BY drv
+  ORDER BY mean_hwy DESC
+")
+```
+
+## Parquet: the columnar file format
+
+**Parquet** -- columnar, compressed, typed. A query reads **only the columns it
+needs** (CSV forces reading every row, as text). Write it, then query it:
+
+```{r}
+# export mpg to a Parquet file on disk
+dbExecute(duck, "COPY (SELECT * FROM mpg) TO 'mpg.parquet' (FORMAT PARQUET)")
+
+# query the .parquet file directly
+dbGetQuery(duck, "
+  SELECT manufacturer, ROUND(AVG(hwy), 1) AS mean_hwy
+  FROM 'mpg.parquet'
+  WHERE year = 2008
+  GROUP BY manufacturer
+  ORDER BY mean_hwy DESC
+  LIMIT 5
+")
+```
+
+Modern analytics is often just **a folder of Parquet files** queried by DuckDB.
+
+## A note on Arrow
+
+**Arrow** is the in-memory columnar standard -- tools pass columnar data with no
+copy. DuckDB is built on it; Parquet is its on-disk form. Columnar **in memory
+(Arrow), on disk (Parquet), in the engine (DuckDB)** is the backbone of modern
+analytics -- all driven by the SQL and `dplyr` you already know.
+
+## When data outgrows one machine
+
+Too big for one machine? **Shard** it -- split the table across many machines;
+the database routes each query and merges the results. Warehouses (BigQuery,
+Snowflake, Redshift) do this for you. From the outside: still **just SQL**.
+
+## Which database when?
+
+| You want to...                                    | Reach for           |
+|---------------------------------------------------|---------------------|
+| Learn SQL; a small app's local storage            | **SQLite**          |
+| Analyze big local tables / Parquet files, fast    | **DuckDB**          |
+| A shared database many apps read & write          | Postgres / MySQL    |
+| Query an organization's enormous warehouse        | BigQuery, Snowflake |
+
+From R, all are `dbConnect()` + `DBI` + `dbplyr` -- learn the interface once.
+
+## The real payoff: SQL is portable
+
+Look again at what `dbGetQuery()` sent:
+
+```{r}
+dbGetQuery(con, "
+  SELECT manufacturer, AVG(hwy) AS mean_hwy
+  FROM mpg WHERE year = 2008
+  GROUP BY manufacturer ORDER BY mean_hwy DESC LIMIT 5
+")
+```
+
+That string is **not R** -- it's the database's language. It transfers to any
+host language that can open a database.
+
+## The same SQL, from Python
+
+`sql_from_python.py` (in this folder, Python standard library only) loads the
+same `mpg.csv` and runs the **identical SQL**:
+
+```python
+import sqlite3
+con = sqlite3.connect(":memory:")
+# ... load mpg.csv into a table called `mpg` ...
+
+con.execute("""
+    SELECT manufacturer, AVG(hwy) AS mean_hwy
+    FROM mpg
+    WHERE year = 2008
+    GROUP BY manufacturer
+    ORDER BY mean_hwy DESC
+    LIMIT 5
+""").fetchall()
+```
+
+The host changed (`con.execute`), the SQL didn't.
+
+## It really runs
+
+`python3 sql_from_python.py` output -- checked in, printed here live:
+
+```{r}
+writeLines(readLines("sql_from_python_output.txt"))
+```
+
+Same answer as R. **That is the value of SQL**: one query language, any host.
+
+## Summary
+
+* Databases: too big for memory, persistent, shared, and fast (**indexes**).
+* `DBI`: `dbConnect()` / `dbWriteTable()` / `dbGetQuery()`; only `dbConnect()` is
+  backend-specific.
+* **SQL**: one `SELECT` (`FROM`/`WHERE`/`GROUP BY`/`HAVING`/`ORDER BY`/`LIMIT`),
+  plus `JOIN`, `WITH`, and window functions -- almost one-to-one with `dplyr`.
+* `dbplyr`: `dplyr` → SQL, **lazy**; `collect()` to pull, `show_query()` to see.
+* Pattern: do the work in the database, `collect()` the small result.
+* Engines vary (row/column, OLTP/OLAP); **DuckDB** queries **CSV/Parquet**
+  directly. Parquet (disk) + Arrow (memory) = the columnar backbone.
+* SQL is **portable** across host languages.
+
+Reading: [R for Data Science (2e), "Databases"](https://r4ds.hadley.nz/databases),
+the [`dbplyr` website](https://dbplyr.tidyverse.org/), and
+[DuckDB's R docs](https://duckdb.org/docs/api/r).
